@@ -1,0 +1,1465 @@
+<!-- Copyright (c) 2019 danamlund -->
+ 
+<!-- This program is free software: you can redistribute it and/or modify   -->
+<!-- it under the terms of the GNU General Public License as published by   -->
+<!-- the Free Software Foundation, version 3. -->
+
+<!-- This program is distributed in the hope that it will be useful, but  -->
+<!-- WITHOUT ANY WARRANTY; without even the implied warranty of  -->
+<!-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU  -->
+<!-- General Public License for more details. -->
+
+<!-- You should have received a copy of the GNU General Public License  -->
+<!-- along with this program. If not, see <http://www.gnu.org/licenses/>. -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fun minesweeper</title>
+<script>
+/* 
+ * Copyright (c) 2019 danamlund
+ * 
+ * This program is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU General Public License as published by  
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License 
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+// Object defining a Minesweeper game. How to dig/flag, when game is won/lost.
+function Minesweeper(args) {
+    this.args = args || {};
+    seed = this.args.seed || Math.floor(Math.random() * 2147483647);
+    seed = seed % 2147483647;
+    if (seed <= 0) {
+        seed += 2147483646;
+    }
+    function rand() {
+        return seed = seed * 16807 % 2147483647;
+    }
+
+    this.width = this.args.width || 16;
+    this.height = this.args.height || 16;
+    this.mines = this.args.mines || 40;
+    this.blocks = this.args.blocks || 0;
+    this.seed = seed;
+    this._mined = [];
+    this._flagged = [];
+    this._dug = [];
+    this._blocked = [];
+    this.initialDugs = this.args.initialDugs;
+
+    // Initializes/clears game
+    this.clear = function() {
+        for (var x = 0; x < this.width; x++) {
+            this._mined[x] = [];
+            this._flagged[x] = [];
+            this._dug[x] = [];
+            this._blocked[x] = [];
+            for (var y = 0; y < this.height; y++) {
+                this._mined[x][y] = false;
+                this._flagged[x][y] = false;
+                this._dug[x][y] = false;
+                this._blocked[x][y] = false;
+            }
+        }
+    }
+
+    this.clearDugAndFlagged = function() {
+        for (var x = 0; x < this.width; x++) {
+            this._dug[x] = [];
+            this._flagged[x] = [];
+            for (var y = 0; y < this.height; y++) {
+                this._dug[x][y] = false;
+                this._flagged[x][y] = false;
+            }
+        }
+    }
+
+    this.clearMined = function() {
+        for (var x = 0; x < this.width; x++) {
+            this._mined[x] = [];
+            for (var y = 0; y < this.height; y++) {
+                this._mined[x][y] = false;
+            }
+        }
+    }
+
+    this.clearBlocked = function() {
+        for (var x = 0; x < this.width; x++) {
+            this._blocked[x] = [];
+            for (var y = 0; y < this.height; y++) {
+                this._blocked[x][y] = false;
+            }
+        }
+    }
+
+    // Places mines randomly
+    this.placeMines = function() {
+        this.clearMined();
+        var count = 10000;
+        for (let blocksLeft = this.blocks; blocksLeft > 0;) {
+            var x = rand() % this.width;
+            var y = rand() % this.height;
+            if (!this._blocked[x][y]) {
+                this._blocked[x][y] = true;
+                blocksLeft--;
+            }
+            if (count-- <= 0) {
+                return;
+            }
+        }
+        for (var minesLeft = this.mines; minesLeft > 0;) {
+            var x = rand() % this.width;
+            var y = rand() % this.height;
+            if (!this._mined[x][y] && !this._blocked[x][y]) {
+                this._mined[x][y] = true;
+                minesLeft--;
+            }
+            if (count-- <= 0) {
+                this.mines -= minesLeft;
+                return;
+            }
+        }
+    };
+
+    this.copyArgs = function() {
+        return JSON.parse(JSON.stringify(this.args));
+    };
+
+    function subsetsMaxSize(elements, picksLeft) {
+        let out = [];
+        for (let i = 1; i <= picksLeft; i++) {
+            for (let subset of subsetsEqualSize(elements, i)) {
+                out.push(subset);
+            }
+        }
+        return out;
+    }
+    function subsetsEqualSize(elements, picksLeft) {
+        return subsets(elements, 0, picksLeft);
+    }
+    function subsets(elements, fromI, picksLeft) {
+        if (picksLeft == 0) {
+            return [];
+        }
+        let out = [];
+        for (let i = fromI; i < elements.length; i++) {
+            let set = [ elements[i] ];
+            if (picksLeft == 1) {
+                out.push(set);
+            } else {
+                for (let subset of subsets(elements, i + 1, picksLeft - 1)) {
+                    out.push(set.concat(subset));
+                }
+            }
+        }
+        return out;
+    }
+    
+    this.copy = function() {
+        let args2 = this.copyArgs();
+        args2.dontInit = true;
+        let copy = new Minesweeper(args2);
+        for (let x = 0; x < this.width; x++) {
+            for (let y = 0; y < this.height; y++) {
+                copy._mined[x][y] = this._mined[x][y];
+                copy._flagged[x][y] = this._flagged[x][y];
+                copy._dug[x][y] = this._dug[x][y];
+                copy._blocked[x][y] = this._blocked[x][y];
+            }
+        }
+        copy.initialDugs = this.initialDugs ? this.initialDugs.splice() : undefined;
+        return copy;
+    };
+
+    this.allMinePlacements = function() {
+        let xys = this.all();
+        let out = [];
+        for (const placement of subsetsEqualSize(xys, this.mines)) {
+            let mines = this.copy();
+            mines.clearMined();
+            for (xy of placement) {
+                mines._mined[xy.x][xy.y] = true;
+            }
+            out.push(mines);
+        }
+
+        return out;
+    };
+
+    this.allBlockPlacements = function() {
+        let xys = this.all();
+        let out = [];
+        for (const placement of subsetsEqualSize(xys, this.blocks)) {
+            let mines = this.copy();
+            mines.clearBlocked();
+            for (xy of placement) {
+                mines._blocked[xy.x][xy.y] = true;
+            }
+            out.push(mines);
+        }
+
+        return out;
+    }
+
+    // List of {x:x, y:y} of all unconnected '0' blocks.
+    this.allInitialDugs = function() {
+        let out = [];
+        for (const xy of this.zeroNumbersGroups()) {
+            let mines = this.copy();
+            mines.initialDugs = [ xy ];
+            mines.restart();
+            out.push(mines);
+        }
+        return out;
+    }
+
+    // List of all subsets of allInitialDugs()
+    this.allInitialDugsSubsets = function() {
+        let initialDugs = this.zeroNumbersGroups();
+
+        let out = [];
+        for (const subset of subsetsMaxSize(initialDugs, initialDugs.length)) {
+            let mines = this.copy();
+            mines.initialDugs = subset;
+            mines.restart();
+            out.push(mines);
+        }
+        return out;
+    }
+
+    this.dug = function(x, y) {
+        if (y === undefined) {
+            y = x.y;
+            x = x.x;
+        }
+        return this._dug[x][y];
+    };
+
+    this.flagged = function(x, y) {
+        if (y === undefined) {
+            y = x.y;
+            x = x.x;
+        }
+        return this._flagged[x][y];
+    };
+
+    this.mined = function(x, y) {
+        if (y === undefined) {
+            y = x.y;
+            x = x.x;
+        }
+        return this._mined[x][y];
+    };
+
+    this.blocked = function(x, y) {
+        if (y === undefined) {
+            y = x.y;
+            x = x.x;
+        }
+        return this._blocked[x][y];
+    };
+
+    this.free = function(x, y) {
+        if (y === undefined) {
+            y = x.y;
+            x = x.x;
+        }
+        return !this.dug(x, y) && !this.flagged(x, y) && !this.blocked(x, y);
+    };
+
+    // List of {x:x,y:y} blocks neighboring the given block.
+    this.neighbors = function(x, y) {
+        if (y === undefined) {
+            y = x.y;
+            x = x.x;
+        }
+        var out = [];
+        for (var dx = -1; dx <= 1; dx++) {
+            for (var dy = -1; dy <= 1; dy++) {
+                if (x+dx >= 0 && x+dx < this.width
+                    && y+dy >= 0 && y+dy < this.height
+                    && !(dx == 0 && dy == 0)
+                    && !this.blocked(x+dx, y+dy)) {
+                    out.push({x:x+dx, y:y+dy});
+                }
+            }
+        }
+        return out;
+    }
+    this.forAll = function(fun) {
+        for (var x = 0; x < this.width; x++) {
+            for (var y = 0; y < this.height; y++) {
+                if (!this.blocked(x, y)) {
+                    fun(x, y);
+                }
+            }
+        }
+    }
+    this.all = function() {
+        var out = [];
+        this.forAll((x,y) => out.push({x:x, y:y}));
+        return out;
+    };
+    
+    this.dig = function(x, y) {
+        if (y === undefined) {
+            y = x.y;
+            x = x.x;
+        }
+        if (!this.dug(x, y) && !this.flagged(x, y) && !this.blocked(x, y)) {
+            this._dug[x][y] = true;
+            
+            if (!this.mined(x, y) && this.number(x, y) == 0) {
+                for (var n of this.neighbors(x, y)) {
+                    this.dig(n.x, n.y);
+                }
+            }
+        }
+    };
+    
+    this.flag = function(x, y) {
+        if (y === undefined) {
+            y = x.y;
+            x = x.x;
+        }
+        if (!this.dug(x, y) && !this.blocked(x, y)) {
+            this._flagged[x][y] = !this._flagged[x][y];
+        }
+    }
+    this.lost = function() {
+        for (var p of this.all()) {
+            if (this.dug(p.x, p.y) && this.mined(p.x, p.y)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    this.won = function() {
+        for (var p of this.all()) {
+            if (!this.dug(p.x, p.y) && !this.mined(p.x, p.y)) {
+                return false;
+            }
+        }
+        return !this.lost();
+    }
+    this.minesLeft = function() {
+        var flagged = 0;
+        this.forAll((x,y) => {
+            if (this.flagged(x, y)) {
+                flagged++;
+            }});
+        return this.mines - flagged;
+    }
+    this.info = function(x, y) {
+        if (y === undefined) {
+            y = x.y;
+            x = x.x;
+        }
+        var out = {};
+        out.neighbors = 0;
+        out.mined = 0;
+        out.dug = 0;
+        out.flagged = 0;
+        out.empty = 0;
+        for (var n of this.neighbors(x, y)) {
+            out.neighbors++;
+            if (this.mined(n.x, n.y)) {
+                out.mined++;
+            }
+            if (this.dug(n.x, n.y)) {
+                out.dug++;
+            }
+            else if (this.flagged(n.x, n.y)) {
+                out.flagged++;
+            }
+            else {
+                out.empty++;
+            }
+        }
+        return out;
+    }
+    // Number of mines around given block.
+    this.number = function(x, y) {
+        if (y === undefined) {
+            y = x.y;
+            x = x.x;
+        }
+        return this.info(x, y).mined;
+    }
+
+    this.matrix = function() {
+        var matrix = [];
+        for (var x = 0; x < this.width; x++) {
+            matrix[x] = [];
+        }
+        out = {};
+        out.set = function(x, y) {
+            if (y === undefined) {
+                y = x.y;
+                x = x.x;
+            }
+            matrix[x][y] = true;
+        }
+        out.get = function(x, y) {
+            if (y === undefined) {
+                y = x.y;
+                x = x.x;
+            }
+            return matrix[x][y];
+        }
+        return out;
+    }
+
+    this.zeroNeighbors = function(x, y, marked) {
+        if (!marked) {
+            marked = this.matrix();
+        }
+        if (marked.get(x, y)) {
+            return 0;
+        }
+        marked.set(x, y);
+        if (!this.mined(x, y) && this.number(x, y) == 0) {
+            zeros = 1;
+            for (var n of this.neighbors(x, y)) {
+                zeros += this.zeroNeighbors(n.x, n.y, marked);
+            }
+            return zeros;
+        } else {
+            return 0;
+        }
+    };
+
+    this.highestZeroNeighbors = function() {
+        var highest = { x:-1, y:-1, zeros:0 };
+        this.forAll((x,y) => {
+            var zeros = this.zeroNeighbors(x, y);
+            if (zeros > highest.zeros) {
+                highest.x = x;
+                highest.y = y;
+                highest.zeros = zeros;
+            }
+        });
+        if (highest.x == -1) {
+            return null;
+        } else {
+            return highest;
+        }
+    };
+
+    this.zeroNumbersGroups = function() {
+        let groups = [];
+        let marked = this.matrix();
+        for (const xy of this.all()) {
+            if (!marked.get(xy)) {
+                if (this.zeroNeighbors(xy.x, xy.y, marked) >= 1) {
+                    groups.push(xy);
+                }
+            }
+        }
+        return groups;
+    }
+
+    this.start = function() {
+        if (this.initialDugs) {
+            for (let xy of this.initialDugs) {
+                this.dig(xy);
+            }
+        } else {
+            highest = this.highestZeroNeighbors();
+            if (highest) {
+                this.dig(highest.x, highest.y);
+            }
+        }
+    }
+
+    this.restart = function() {
+        this.clearDugAndFlagged();
+        this.start();
+    }
+
+    this.clear();
+    if (!this.args.dontInit) {
+        this.placeMines();
+        this.start();
+    }
+    
+    return this;
+}
+/* 
+ * Copyright (c) 2019 danamlund
+ * 
+ * This program is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU General Public License as published by  
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License 
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+// GUI for minesweeper game given a canvas Element and a Minesweeper Object.
+function MinesweeperUi(canvas, mines) {
+    let o = {};
+    let x = 0;
+    let y = 0;
+    let ctx = canvas.getContext("2d");
+    mines = mines || new Minesweeper();
+    let solveXys = {};
+    let leftMouseAction = "dig"; // "dig", "flag", "solve"
+    let startTime = new Date();
+    let endTime = null;
+
+    function calcFont(ctx, text, width, height) {
+        let oldFont = ctx.font;
+        for (var i = 50; i > 8; i--) {
+            ctx.font = i+"px sans-serif";
+            if (ctx.measureText(text).width < width && ctx.measureText("M").width < height) {
+                break;
+            }
+        }
+        let font = ctx.font;
+        ctx.font = oldFont;
+        return font;
+    }
+
+    function duration(start, end) {
+        function leftPad(string, length, pad) {
+            string = "" + string;
+            while (string.length < length) {
+                string = pad + string;
+            }
+            return string;
+        }
+        
+        let durationMs = end - start;
+        let duration = "";
+        if (durationMs >= 60 * 60 * 1000) {
+            let hours = (durationMs / (60 * 60 * 1000)).toFixed(0);
+            duration += leftPad(hours, 2, "0") + ".";
+        }
+        if (durationMs >= 60 * 1000) {
+            let minutes = ((durationMs % (60 * 60 * 1000)) / (60 * 1000)).toFixed(0);
+            duration += leftPad(minutes, 2, "0") + ":";
+        }
+        let seconds = ((durationMs / 1000) % 60).toFixed(0) ;
+        duration += leftPad(seconds, 2, "0") + ",";
+        let ms = ((durationMs % 1000) / 10).toFixed(0);
+        duration += leftPad(ms, 2, "0");
+        return duration;
+    }
+    function draw(canvas, mines, posx, posy) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let blockWidth = Math.max(3, mines.width + 1);
+        let blockHeight = Math.max(5, mines.height + 1);
+        var size = Math.floor(Math.min(canvas.width / blockWidth, canvas.height / blockHeight));
+        var margin = 1;
+        var size_wo_margin = size - 2*margin;
+        
+        let numberFont = calcFont(ctx, "M", size_wo_margin*0.70, size_wo_margin*0.70);
+        let probFont = calcFont(ctx, "9.99", size_wo_margin*0.70, size_wo_margin*0.70);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        function posXMiddle(x) {
+            return x * size + margin + size_wo_margin/2;
+        }
+        function posYMiddle(y) {
+            return y * size + margin + size_wo_margin/2 + size_wo_margin * 0.1;
+        }
+        function posXStart(x) {
+            return x * size + margin;
+        }
+        function posYStart(y) {
+            return y * size + margin;
+        }
+        
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(posXStart(posx) - 2*margin, posYStart(posy) - 2*margin,
+                     size + 2*margin, size + 2*margin);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(posXStart(posx), posYStart(posy), size_wo_margin, size_wo_margin);
+
+        let solution = new MinesweeperSolve(mines).permutes(Object.values(solveXys));
+
+        var flagged = 0;
+        mines.forAll((x,y) => {
+            let key = x+","+y;
+            ctx.fillStyle = "#cccccc";
+            var char = false;
+            if (mines.flagged(x, y)) {
+                flagged++;
+                char = "🚩";
+            }
+            if (mines.dug(x, y)) {
+                ctx.fillStyle = "#aaaaaa";
+                if (mines.mined(x, y)) {
+                    char = "💣";
+                } else {
+                    char = ""+mines.number(x, y);
+                }
+            } 
+            if (key in solveXys) {
+                ctx.fillStyle = "#ffcccc";
+            }
+            ctx.fillRect(posXStart(x), posYStart(y), size_wo_margin, size_wo_margin);
+
+            ctx.font = numberFont;
+            if (key in solution) {
+                char = ""+solution[key]["isMine"].toFixed(2)
+                ctx.font = probFont;
+            }
+            
+            if (char && char != "0") {
+                ctx.fillStyle = "#000000";
+                ctx.fillText(char, posXMiddle(x), posYMiddle(y));
+            }
+        });
+
+        // bottom status
+        {
+            var text = "Mines: " + mines.mines
+                + "  left: " + (mines.mines - flagged)
+                + "  time: " + duration(startTime, endTime ? endTime : new Date());
+            
+            if (mines.won()) {
+                text += "  WON";
+            }
+            if (mines.lost()) {
+                text += "  LOST";
+            }
+            ctx.font = calcFont(ctx, text, blockWidth * size, size * 0.7);
+            ctx.fillStyle = "#000000";
+            ctx.fillText(text, blockWidth * size / 2, posYMiddle(blockHeight - 1));
+        }
+
+        // right column
+        ctx.font = numberFont;
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(posXStart(blockWidth - 1) - margin, posYStart(0) - margin, size, 3 * size);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(posXStart(blockWidth - 1), posYStart(0), size_wo_margin, 3*size - 2*margin);
+        ctx.fillStyle = "#000000";
+
+        function highlight(x, y) {
+            ctx.fillStyle = "#cccccc";
+            ctx.fillRect(posXStart(x), posYStart(y), size_wo_margin, size_wo_margin);
+            ctx.fillStyle = "#000000";
+        }
+        
+        if (leftMouseAction == "dig") {
+            highlight(blockWidth - 1, 0);
+        }
+        ctx.fillText("⛏", posXMiddle(blockWidth - 1), posYMiddle(0));
+
+        if (leftMouseAction == "flag") {
+            highlight(blockWidth - 1, 1);
+        }
+        ctx.fillText("🚩", posXMiddle(blockWidth - 1), posYMiddle(1));
+
+        if (leftMouseAction == "solve") {
+            highlight(blockWidth - 1, 2);
+        }
+        ctx.fillText("⚙", posXMiddle(blockWidth - 1), posYMiddle(2));
+        ctx.fillText("⟳", posXMiddle(blockWidth - 1), posYMiddle(3));
+    }
+
+    function digRemaining(x, y) {
+        var number = mines.number(x, y);
+        if (mines.dug(x, y) && mines.info(x, y).flagged == number) {
+            for (var n of mines.neighbors(x, y)) {
+                mines.dig(n.x, n.y);
+            }
+        }
+    }
+    function toggleSolve(x, y) {
+        let key = x+","+y;
+        if (key in solveXys) {
+            delete solveXys[key];
+        } else {
+            solveXys[key] = {x:x, y:y};
+        }
+    }
+    function restart() {
+        mines.restart();
+        startTime = new Date();
+        endTime = null;
+    }
+    function gameover() {
+        if (mines.won() || mines.lost()) {
+            if (!endTime) {
+                endTime = new Date();
+            }
+            return true;
+        }
+        return false;
+    }
+    function keyDownHandler(e) {
+        if (e.key == "r") {
+            restart();
+            draw(canvas, mines, x, y);
+            return;
+        }
+        
+        if (gameover()) {
+            return;
+        }
+        if (e.key == "ArrowLeft") {
+            if (x > 0) {
+                x--;
+            }
+        } else if (e.key == "ArrowRight") {
+            if (x < mines.width - 1) {
+                x++;
+            }
+        } else if (e.key == "ArrowUp") {
+            if (y > 0) {
+                y--;
+            }
+        } else if (e.key == "ArrowDown") {
+            if (y < mines.height - 1) {
+                y++;
+            }
+        } else if (e.key == "d") {
+            digRemaining(x, y);
+            mines.dig(x, y);
+        } else if (e.key == "f") {
+            mines.flag(x, y);
+        } else if (e.key == "s") {
+            toggleSolve(x, y);
+        } else if (e.key == "1") {
+            new MinesweeperSolve(mines).solveSubsetSize(1);
+        } else if (e.key == "2") {
+            new MinesweeperSolve(mines).solveSubsetSize(2);
+        } else if (e.key == "3") {
+            new MinesweeperSolve(mines).solveSubsetSize(3);
+        } else if (e.key == "4") {
+            let solve = new MinesweeperSolve(mines);
+            solve.applySolution(solve.permuteAll());
+        } else {
+            return;
+        }
+        draw(canvas, mines, x, y);
+        e.preventDefault();
+    }
+    var prevLeftClick = 0;
+    function onClick(e) {
+        var rect = canvas.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+        mouseY = e.clientY - rect.top;
+
+        let blockWidth = Math.max(3, mines.width + 1);
+        let blockHeight = Math.max(5, mines.height + 1);
+        var size = Math.floor(Math.min(canvas.width / blockWidth, canvas.height / blockHeight));
+        var newX = Math.floor(mouseX / size);
+        var newY = Math.floor(mouseY / size);
+
+        if (newX == blockWidth - 1) {
+            if (newY == 0) {
+                leftMouseAction = "dig";
+            } else if (newY == 1) {
+                leftMouseAction = "flag";
+            } else if (newY == 2) {
+                leftMouseAction = "solve";
+            } else if (newY == 3) {
+                restart();
+            }
+            draw(canvas, mines, x, y);
+        }
+        
+        if (newX < 0 || newX >= mines.width || newY < 0 || newY >= mines.height) {
+            return;
+        }
+        if (gameover()) {
+            return;
+        }
+        x = newX;
+        y = newY;
+        if (e.which == 2 || e.which == 1 && (new Date().getTime() - prevLeftClick) < 300) {
+            // middle-button or 2x click
+            digRemaining(x, y);
+        }
+        prevLeftClick = 0;
+        if (e.which == 1) {
+            // left button
+            if (leftMouseAction == "dig") {
+                mines.dig(x, y);
+            } else if (leftMouseAction == "flag") {
+                mines.flag(x, y);
+            } else if (leftMouseAction == "solve") {
+                toggleSolve(x, y);
+            }
+            prevLeftClick = new Date().getTime();
+        } else if (e.which == 3) { // right button
+            mines.flag(x, y);
+            if (mines.dug(x, y)) {
+                toggleSolve(x, y);
+            }
+        }
+        draw(canvas, mines, x, y);
+        e.preventDefault();
+    }
+
+    o.cleanup = function() {
+        canvas.removeEventListener("keydown", keyDownHandler);
+        canvas.removeEventListener("click", onClick);
+        canvas.removeEventListener("contextmenu", onClick);
+    };
+    
+    canvas.addEventListener("keydown", keyDownHandler, false);
+    canvas.addEventListener("click", onClick, false);
+    canvas.addEventListener("contextmenu", onClick, false);
+    draw(canvas, mines, x, y);
+    
+    return o;
+}
+/* 
+ * Copyright (c) 2019 danamlund
+ * 
+ * This program is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU General Public License as published by  
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License 
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+// Automaticaly solve a minesweeper game (of Object type Minesweeper).
+function MinesweeperSolve(mines) {
+    let o = {};
+
+    const MAX_FREES_AMOUNT = 25;
+    
+    function xyKey(xy) {
+        return xy.x + "," + xy.y;
+    }
+
+    function countBits(n) {
+        let count = 0;
+        while (n != 0) {
+            n = n & (n - 1);
+            count++;
+        }
+        return count;
+    }
+
+    function preparePermutes(infoXys) {
+        let frees = [];
+        let freesToIndex = {};
+        let constraints = [];
+        for (const infoXy of infoXys) {
+            if (mines.dug(infoXy)) {
+                const info = mines.info(infoXy);
+                if (info.empty >= 1) {
+                    let infoXyFreeIndices = [];
+                    for (const xy of mines.neighbors(infoXy)) {
+                        if (mines.free(xy)) {
+                            if (!(xyKey(xy) in freesToIndex)) {
+                                frees.push(xy);
+                                freesToIndex[xyKey(xy)] = frees.length - 1;
+                            }
+                            infoXyFreeIndices.push(freesToIndex[xyKey(xy)]);
+                        }
+                    }
+                    if (infoXyFreeIndices.length >= 1) {
+                        let constraint = {};
+                        constraint["expects"] = info.mined - info.flagged;
+                        constraint["andNumber"] = 0;
+                        for (const index of infoXyFreeIndices) {
+                            constraint["andNumber"] += 1 << index;
+                        }
+                        constraints.push(constraint);
+                    }
+                }
+            }
+        }
+        return { frees:frees, constraints:constraints };
+    }
+
+    function doPermutes(frees, constraints, doNotCheckMinesLeft) {
+        if (frees.length > MAX_FREES_AMOUNT) {
+            throw "Too many frees";
+        }
+        
+        const minesNumberMax = 1 << frees.length;
+        let indexIsMineCounts = [];
+        let indexIsNotMineCounts = [];
+        for (let i = 0; i < frees.length; i++) {
+            indexIsMineCounts[i] = 0;
+            indexIsNotMineCounts[i] = 0;
+        }
+
+        let maxMinesSeen = 0;
+        for (let minesNumber = 0; minesNumber < minesNumberMax; minesNumber++) {
+            let valid = true;
+            for (const constraint of constraints) {
+                if (countBits(minesNumber & constraint["andNumber"]) != constraint["expects"]) {
+                    valid = false;
+                    break;
+                }
+            }
+            if (valid) {
+                let minesSeen = 0;
+                for (let i = 0; i < frees.length; i++) {
+                    if ((minesNumber & (1 << i)) > 0) {
+                        minesSeen++;
+                    }
+                }
+                if (doNotCheckMinesLeft || minesSeen <= mines.minesLeft()) {
+                    if (minesSeen > maxMinesSeen) {
+                        maxMinesSeen = minesSeen;
+                    }
+                    for (let i = 0; i < frees.length; i++) {
+                        if ((minesNumber & (1 << i)) > 0) {
+                            indexIsMineCounts[i]++;
+                        } else {
+                            indexIsNotMineCounts[i]++;
+                        }
+                    }
+                }
+            }
+        }
+        let xyToMineProbability = {};
+        for (let i = 0; i < frees.length; i++) {
+            xyToMineProbability[xyKey(frees[i])] = {
+                "xy": frees[i],
+                "isMine": indexIsMineCounts[i]
+                    / (indexIsMineCounts[i] + indexIsNotMineCounts[i])};
+        }
+        return xyToMineProbability;
+    }
+
+    function addAllFrees(frees) {
+        let freesMap = {}
+        for (const free of frees) {
+            freesMap[xyKey(free)] = true;
+        }
+        for (const xy of mines.all()) {
+            if (mines.free(xy) && !(xyKey(xy) in freesMap)) {
+                frees.push(xy);
+            }
+        }
+    }
+    o.permutes = function(infoXys, doNotCheckMinesLeft, includeAllFrees) {
+        let prepare = preparePermutes(infoXys);
+        let frees = prepare.frees;
+        let constraints = prepare.constraints;
+
+        if (includeAllFrees) {
+            o.addAllFrees(frees);
+        }
+        
+        return doPermutes(frees, constraints, doNotCheckMinesLeft);
+    };
+
+    o.allInfoXys = function() {
+        let infoXys = [];
+        for (const xy of mines.all()) {
+            if (mines.dug(xy) && mines.info(xy).empty >= 1) {
+                infoXys.push(xy);
+            }
+        }
+        return infoXys;
+    }
+
+
+    o.permuteAll = function(maxFreesAmount) {
+        maxFreesAmount = maxFreesAmount || MAX_FREES_AMOUNT
+        let allInfoXys = o.allInfoXys();
+        let prepare = preparePermutes(allInfoXys);
+        let frees = prepare.frees;
+        let constraints = prepare.constraints;
+
+        addAllFrees(frees);
+        
+        if (frees.length > maxFreesAmount) {
+            return {};
+        }
+        return doPermutes(frees, constraints);
+    }
+
+    function subsetsOfSize(subsetSize) {
+        let possibles = [];
+        for (const xy of mines.all()) {
+            if (mines.dug(xy) && mines.info(xy).empty >= 1) {
+                possibles.push(xy);
+            }
+        }
+
+        function subsets(elements, fromI, picksLeft) {
+            if (picksLeft == 0) {
+                return [];
+            }
+            let out = [];
+            for (let i = fromI; i < elements.length; i++) {
+                let set = [ elements[i] ];
+                if (picksLeft == 1) {
+                    out.push(set);
+                } else {
+                    for (let subset of subsets(elements, i + 1, picksLeft - 1)) {
+                        out.push(set.concat(subset));
+                    }
+                }
+            }
+            return out;
+        }
+
+        return subsets(possibles, 0, subsetSize);
+    };
+
+    o.permutesSubsetSize = function(subsetSize, doNotCheckMinesLeft, addAllFrees) {
+        for (let subset of subsetsOfSize(subsetSize)) {
+            let xyToMineProbability = o.permutes(subset, doNotCheckMinesLeft, addAllFrees);
+            for (xySolution of Object.values(xyToMineProbability)) {
+                if (xySolution.isMine == 0.0 || xySolution.isMine == 1.0) {
+                    return xyToMineProbability;
+                }
+            }
+        }
+        return {};
+    };
+
+    o.applySolution = function(xyToMineProbability) {
+        let moves = 0;
+        for (xySolution of Object.values(xyToMineProbability)) {
+            if (xySolution.isMine == 0.0) {
+                mines.dig(xySolution.xy);
+                moves++;
+            }
+            if (xySolution.isMine == 1.0) {
+                mines.flag(xySolution.xy);
+                moves++;
+            }
+        }
+
+        return moves;
+    };
+
+    o.solveScore = function(maxFreesAmount) {
+        scores = {};
+        scores.permute1 = 0;
+        scores.permute2 = 0;
+        scores.permute3 = 0;
+        scores.permuteAll = 0;
+        scores.unsolveable = 0;
+        scores.steps = 0;
+        scores.score = 0;
+
+        while (true) {
+            scores.steps++;
+            let moves = o.applySolution(o.permutesSubsetSize(1));
+            if (moves) {
+                scores.permute1 += moves;
+                continue;
+            }
+            moves = o.applySolution(o.permutesSubsetSize(2));
+            if (moves) {
+                scores.permute2 += moves;
+                continue;
+            }
+            moves = o.applySolution(o.permutesSubsetSize(3));
+            if (moves) {
+                scores.permute3 += moves;
+                continue;
+            }
+            moves = o.applySolution(o.permuteAll(maxFreesAmount));
+            if (moves) {
+                scores.permuteAll += moves;
+                continue;
+            }
+            let frees = 0;
+            for (const xy of mines.all()) {
+                if (mines.free(xy)) {
+                    frees++;
+                }
+            }
+            scores.unsolveable = frees;
+            break;
+        }
+
+        scores.score = scores.permute2 + scores.permute3 * 2 + scores.permuteAll * 3;
+        if (scores.unsolveable >= 1) {
+            scores.score = -scores.score - 1;
+        }
+        
+        return scores;
+    };
+    
+    o.solve = function() {
+        return o.solveScore(maxFreesAmount).unsolveable == 0;
+    };
+    
+    o.solveSubsetSize =  function(subsetSize) {
+        let didWork = true;
+        while (didWork) {
+            didWork = false;
+            for (let i = 1; i <= subsetSize; i++) {
+                if (o.applySolution(o.permutesSubsetSize(subsetSize))) {
+                    didWork = true;
+                    break;
+                }
+            }
+        }
+        return mines.won();
+    }
+    
+    return o;
+}
+/* 
+ * Copyright (c) 2019 danamlund
+ * 
+ * This program is free software: you can redistribute it and/or modify  
+ * it under the terms of the GNU General Public License as published by  
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but 
+ * WITHOUT ANY WARRANTY; without even the implied warranty of 
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License 
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+// Fills a div with minesweeper game and controls to generate fun games.
+function MinesweeperMain(divElementToPopulate) {
+
+    divElementToPopulate.innerHTML = `
+<canvas class="canvas" tabindex="0" width="500" height="500"></canvas>
+<table><tr align="right">
+<td>width: <input type="text" class="width" value="16" /></td>
+<td>mines: <input type="text" class="mines" value="40" /></td>
+<td>iterations: <input type="text" class="iterations" value="3" /></td>
+<td>board width (px): <input type="text" class="canvaswidth" value="500" /></td>
+</tr><tr align="right">
+<td>height: <input type="text" class="height" value="16" /></td>
+<td>blocks: <input type="text" class="blocks" value="0" /></td>
+<td>seed: <input type="text" class="seed" value="" /></td>
+<td>board height (px): <input type="text" class="canvasheight" value="500" /></td>
+</tr></table>
+<div>Maximize: 
+<select class="max">
+<option>multi blocks</option>
+<option>2 blocks</option>
+<option>3 blocks</option>
+<option>&gt;3 blocks</option>
+<option>not remaining mines</option>
+<option>steps</option>
+</select>
+</div>
+<button class="button">Generate</button>
+<input type="checkbox" class="verbose" /> verbose
+<div class="stopper"></div>
+<div class="log"></div>
+<div class="verbosediv"></div>
+`;
+
+    let minesweeperui = null;
+    let generating = false;
+
+    if (window.location.search.length >= 2) {
+        let urlSeed = window.location.search.substring(1);
+        let params = urlSeed.split("_");
+        divElementToPopulate.querySelector(".width").value = params[0];
+        divElementToPopulate.querySelector(".height").value = params[1];
+        divElementToPopulate.querySelector(".mines").value = params[2];
+        divElementToPopulate.querySelector(".blocks").value = params[3];
+        divElementToPopulate.querySelector(".seed").value = params[4];
+    }
+
+    function getUrlSeed(mines) {
+        return "?"
+            + mines.width + "_"
+            + mines.height + "_"
+            + mines.mines + "_"
+            + mines.blocks + "_"
+            + mines.seed;
+    }
+    
+    function show(mines) {
+        let log = divElementToPopulate.querySelector(".log");
+
+        log.innerHTML += "Mines size=" + mines.width + "x" + mines.height
+            + ", mines=" + mines.mines
+            + ", blocks=" + mines.blocks
+            + ", seed=" + mines.seed;
+        log.innerHTML += " <a href="+getUrlSeed(mines)+">seed url</a>";
+
+        if (minesweeperui) {
+            minesweeperui.cleanup();
+        }
+        let canvas = divElementToPopulate.querySelector(".canvas");
+        minesweeperui = new MinesweeperUi(canvas, mines);
+    }
+
+    function solveScoreString(solveScore) {
+        return "1s=" + solveScore.permute1
+            + ", 2s=" + solveScore.permute2
+            + ", 3s=" + solveScore.permute3
+            + ", alls=" + solveScore.permuteAll
+            + ", steps=" + solveScore.steps
+            + ", unsolveables=" + solveScore.unsolveable
+            + ", score=" + solveScore.score;
+    }
+    
+    function generate() {
+        if (generating) {
+            return;
+        }
+        generating = true;
+        let canvas = divElementToPopulate.querySelector(".canvas");
+        let canvasWidth = parseInt(divElementToPopulate.querySelector(".canvaswidth").value);
+        let canvasHeight = parseInt(divElementToPopulate.querySelector(".canvasheight").value);
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+
+        let width = parseInt(divElementToPopulate.querySelector(".width").value);
+        let height = parseInt(divElementToPopulate.querySelector(".height").value);
+        let minesAmount = parseInt(divElementToPopulate.querySelector(".mines").value);
+        let blocks = parseInt(divElementToPopulate.querySelector(".blocks").value);
+        let iterations = parseInt(divElementToPopulate.querySelector(".iterations").value);
+        let seed = divElementToPopulate.querySelector(".seed").value;
+        let verbose = divElementToPopulate.querySelector(".verbose").checked;
+        let verbosediv = divElementToPopulate.querySelector(".verbosediv");
+        let log = divElementToPopulate.querySelector(".log");
+
+        log.innerHTML = "";
+        verbosediv.innerHTML = "";
+        if (seed) {
+            let mines = new Minesweeper( { width: width,
+                                           height:height,
+                                           mines:minesAmount,
+                                           blocks:blocks,
+                                           seed:seed } );
+            if (verbose) {
+                let solveScore = new MinesweeperSolve(mines).solveScore();
+                log.innerHTML = "Score: " + solveScoreString(solveScore) + "<br/>";
+            }
+            mines.restart();
+            show(mines);
+            generating = false;
+        } else {
+            let maxSelect = divElementToPopulate.querySelector(".max");
+            let maxBy = maxSelect[maxSelect.selectedIndex].text;
+            
+            let bestSolveScore = null;
+            let bestScore = -1;
+            let bestMines = null;
+            let i = 0;
+            let stopped = false;
+            function doStop() {
+                console.log("stop!");
+                stopped = true;
+            }
+            let stopperDiv = divElementToPopulate.querySelector(".stopper");
+            stopperDiv.innerHTML = "<button class=stopperButton>stop</button>";
+            let stopper = stopperDiv.querySelector(".stopperButton");
+            stopper.addEventListener("click", doStop);
+
+            let verboseHtml = "";
+            if (verbose) {
+                verboseHtml = "<table border=1><tr>"
+                    + "<td>1s</td><td>2s</td><td>3s</td><td>alls</td><td>steps</td>"
+                    + "<td>unsolveables</td><td>score</td><td>seed url</td></tr>";
+            }
+            
+            function done(mines) {
+                if (verbose) {
+                    verboseHtml += "</table>";
+                    verbosediv.innerHTML = verboseHtml;
+                }
+                stopper.removeEventListener("click", doStop);
+                stopperDiv.innerHTML = "";
+                mines.restart();
+                show(mines);
+                generating = false;
+            }
+            
+            function iterate() {
+                if (stopped) {
+                    done(bestMines);
+                    return;
+                }
+                
+                mines = new Minesweeper( { width: width,
+                                                 height:height,
+                                                 mines:minesAmount,
+                                                 blocks:blocks,
+                                                 seed:seed } );
+                let solveScore = new MinesweeperSolve(mines).solveScore();
+
+                if (verbose) {
+                    verboseHtml += "<tr>"
+                        + "<td>" + solveScore.permute1 + "</td>"
+                        + "<td>" + solveScore.permute2 + "</td>"
+                        + "<td>" + solveScore.permute3 + "</td>"
+                        + "<td>" + solveScore.permuteAll + "</td>"
+                        + "<td>" + solveScore.steps + "</td>"
+                        + "<td>" + solveScore.unsolveable + "</td>"
+                        + "<td>" + solveScore.score + "</td>"
+                        + "<td><a href=" + getUrlSeed(mines) + ">seed url</a></td>"
+                        + "</tr>";
+                }
+
+                let score = -999;
+                if (maxBy == "multi blocks") {
+                    score = solveScore.score
+                } else if (maxBy == "2 blocks") {
+                    score = solveScore.permute2;
+                } else if (maxBy == "3 blocks") {
+                    score = solveScore.permute3;
+                } else if (maxBy == ">3 blocks") {
+                    score = solveScore.permuteAll;
+                } else if (maxBy == "steps") {
+                    score = solveScore.steps;
+                } else if (maxBy == "not remaining mines") {
+                    score = solveScore.permute2 + 2 * solveScore.permute3;
+                }
+                if (bestSolveScore == null
+                    || (solveScore.unsolveable == 0 && score > bestScore)) {
+                    bestSolveScore = solveScore;
+                    bestScore = score;
+                    bestMines = mines;
+                }
+                i++;
+                if (verbose) {
+                    log.innerHTML = "Best score of " + i + "/" + iterations
+                        + " iterations: " + solveScoreString(bestSolveScore) + "<br/>";
+                } else {
+                    log.innerHTML = "Best score of " + i + "/" + iterations
+                        + " iterations: " + bestScore + "<br/>";
+                }
+                if (i < iterations) {
+                    setTimeout(iterate, 0);
+                } else {
+                    done(bestMines);
+                }
+            }
+            
+            setTimeout(iterate, 0);
+        }
+    }
+    
+    let button = divElementToPopulate.querySelector(".button");
+    button.addEventListener("click", generate);
+    generate();
+}
+</script>
+  </head>
+  <body>
+    <div id="minesweeper"></div>
+    <script>
+      new MinesweeperMain(document.getElementById("minesweeper"));
+    </script>
+
+    <h1>Generate fun minesweeper games</h1>
+    <p>
+      Generate minesweeper games, automatically solve then, score them
+      based on fun-ness, show user the game with the highest score.
+    </p>
+    <p>
+      Fun-ness score is high for moves that require multiple pieces of
+      information. Score is negative for games that require guessing
+      to solve.
+    </p>
+    <p>
+      Marking neighbors around a "1" block with a flagged mine uses 1
+      block of information. 1-blocks are not fun and give no score. A
+      move that requires information about two numbered blocks and
+      their neighbors uses 2 blocks of information and give 1
+      score. 3-blocks give 2 score each. Moves requiring &gt;3 blocks
+      or knowledge about the number of mines left give 3 score each.
+    </p>
+    <p>
+      To score games in a consistent fashion, we start games with the
+      largest area of "0" blocks uncovered.
+    </p>
+    <p>
+      Try some high-scoring games I found:
+    </p>
+      <ul>
+        <li><a href="?16_16_40_0_1422766">16x16</a></li>
+        <li><a href="?16_16_40_0_1808281730">16x16</a></li>
+        <li><a href="?8_8_10_0_1186376845">8x8</a></li>
+      </ul>
+      
+    <h2>Minesweeper controls</h2>
+    <h3>Mouse</h3>
+    <ul>
+      <li>Left-click digs for a mine.</li>
+      <li>Right-click toggle flag.</li>
+      <li>Middle-click/double-left-click on number auto-digs if
+      easy.</li>
+      <li>Right-click on number toggles that block to
+      auto-solver.</li>
+      <li>⟳ restarts current game.</li>
+    </ul>
+
+    <h3>Touch</h3>
+    Top-right icons change behavior of left-click.
+
+    <h3>Keyboard</h3>
+    <ul>
+      <li>Arrows move highlighter around.</li>
+      <li>'d' digs for a mine.</li>
+      <li>'f' toggle flag.</li>
+      <li>'d' on number auto-digs if easy.</li>
+      <li>'s' toggles that block to auto-solver.</li>
+      <li>'r' restart current game.</li>
+      <li>'1' auto-solve 1-blocks.</li>
+      <li>'2' auto-solve 2-blocks.</li>
+      <li>'3' auto-solve 3-blocks.</li>
+      <li>'4' auto-solve all blocks.</li>
+    </ul>
+
+    <h2>Generation controls</h2>
+    <ul>
+      <li>width/height: size of minesweeper game.</li>
+      <li>mines: number of mines to place.</li>
+      <li>blocks: number of blocks to place.</li>
+      <li>iterations: number of games to generate when searching for
+      the best score.</li>
+      <li>seed: number to generate a consistent game. Copy-pasting a
+      seed url is easier.</li>
+      <li>board width/board height: size of the minesweeper game area
+      in pixels.</li>
+      <li>maximize: how to calculate score
+        <ul>
+          <li>multi blocks: more moves that require multiple pieces of
+          information.</li>
+          <li>2 blocks: only moves that require two pieces of
+          information.</li>
+          <li>3 blocks: only moves that require three pieces of
+          information.</li>
+          <li>&gt;3 blocks: only moves that require more than three
+            pieces of information.</li>
+          <li>steps: more iterations of auto-solver needed to solve a
+          game.</li>
+          <li>not remaining mines: rewards 2-blocks and 3-blocks but
+          not &gt;3-blocks. This usually removes the endings requiring
+          you to map out 5 remaining mines.</li>
+        </ul>
+      </li>
+      <li>verbose: show list of all generated games.</li>
+      <li>generate: start generating games.</li>
+      <li>stop: stop generating and use the best one so far.</li>
+    </ul>
+  </body>
+</html>
