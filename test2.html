@@ -1,0 +1,108 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Minesweeper</title>
+    <script src="minesweeper.js"></script>
+    <script src="minesweeperui.js"></script>
+    <script src="minesweepersolve.js"></script>
+    <script src="minesweepermain.js"></script>
+  </head>
+  <body>
+    <div id="minesweeper"></div>
+    <canvas tabindex="0" id="canvas" width="500" height="500"></canvas>
+    <canvas tabindex="0" id="canvas2" width="500" height="500"></canvas>
+    <div id="debug2"></div>
+    <div id="debug"></div>
+    <script>
+
+      new MinesweeperMain(document.getElementById("minesweeper"));
+      
+      let mines;
+      <!-- for (let i = 0; i < 100; i++) { -->
+      <!--   mines = new Minesweeper(); -->
+      <!--   let solve = new MinesweeperSolve(mines); -->
+      <!--   if (!solve.solveSubsetSize(2) -->
+      <!--       && solve.solveSubsetSize(3)) { -->
+      <!--                     <\!-- if (!new MinesweeperSolve(mines).solve()) { -\-> -->
+      <!--                     mines.restart(); -->
+      <!--     new MinesweeperUi("canvas", mines); -->
+      <!--     break; -->
+      <!--   } -->
+      <!-- } -->
+
+      mines = new Minesweeper();
+      <!-- mines = new Minesweeper( { blocks: 50 }); -->
+      <!-- mines = new Minesweeper( { seed:963610835 }); -->
+      <!-- new MinesweeperSolve(mines).permutesSubsetSize(3); -->
+      let solveScore = new MinesweeperSolve(mines).solveScore();
+      mines.restart();
+      new MinesweeperUi(document.getElementById("canvas"), mines);
+    
+
+      let i = 0;
+      for (let mines2 of mines.allInitialDugs()) {
+        let newCanvas = document.createElement("canvas");
+        newCanvas.tabIndex = 0;
+        newCanvas.width = 400;
+        newCanvas.height = 400;
+        newCanvas.id = "canvas_"+(i++);
+        document.body.appendChild(newCanvas);
+        new MinesweeperUi(newCanvas, mines2);
+      }
+      
+
+      <!-- let solved = 0; -->
+      <!-- let i = 0; -->
+      <!-- for (mines of new Minesweeper( { width:3, height:3, mines:2 }).allMinePlacements()) { -->
+      <!--   let newCanvas = document.createElement("canvas"); -->
+      <!--   newCanvas.tabIndex = 0; -->
+      <!--   newCanvas.width = 100; -->
+      <!--   newCanvas.height = 100; -->
+      <!--   newCanvas.id = "canvas_"+(i++); -->
+      <!--   document.body.appendChild(newCanvas); -->
+      <!--   mines.start(); -->
+      <!--   let solve = new MinesweeperSolve(mines); -->
+      <!--   if (!solve.solveSubsetSize(1) -->
+      <!--       && solve.solveSubsetSize(2)) { -->
+      <!--     mines.restart(); -->
+      <!--     new MinesweeperUi(newCanvas.id, mines); -->
+      <!--     solved++; -->
+      <!--   } -->
+      <!--   <\!-- if (new MinesweeperSolve(mines).solve()) solved++; -\-> -->
+      <!--   <\!-- new MinesweeperUi(newCanvas.id, mines); -\-> -->
+      <!-- } -->
+      <!-- debug("i="+i+", solved="+solved); -->
+
+      <!-- let solved = 0; -->
+      <!-- let i = 0; -->
+      <!-- for (mines of new Minesweeper( { width:7, height:3, mines:3 }).allMinePlacements()) { -->
+      <!--   mines.start(); -->
+      <!--   let solve = new MinesweeperSolve(mines); -->
+      <!--   if (!solve.solveSubsetSize(2) -->
+      <!--       && solve.solveSubsetSize(3)) { -->
+      <!--     let newCanvas = document.createElement("canvas"); -->
+      <!--     newCanvas.tabIndex = 0; -->
+      <!--     newCanvas.width = 100; -->
+      <!--     newCanvas.height = 100; -->
+      <!--     newCanvas.id = "canvas_"+(i++); -->
+      <!--     document.body.appendChild(newCanvas); -->
+      <!--     mines.restart(); -->
+      <!--     new MinesweeperUi(newCanvas.id, mines); -->
+      <!--     solved++; -->
+      <!--   } -->
+      <!--   <\!-- if (new MinesweeperSolve(mines).solve()) solved++; -\-> -->
+      <!--   <\!-- new MinesweeperUi(newCanvas.id, mines); -\-> -->
+      <!-- } -->
+      <!-- debug("i="+i+", solved="+solved); -->
+      
+      
+      <!-- new MinesweeperUi("canvas", new Minesweeper( { seed:1233620691 })); -->
+      <!-- new MinesweeperUi("canvas", new Minesweeper( { seed:263198520 })); -->
+      <!-- new MinesweeperUi("canvas", new Minesweeper( { seed:920418657 })); -->
+      <!-- new MinesweeperUi("canvas", new Minesweeper( { seed:1315417710 })); -->
+      <!-- new MinesweeperUi("canvas", new Minesweeper( { seed:117826667 })); -->
+      <!-- new MinesweeperUi("canvas", new Minesweeper( { width:5, height:5, mines:5, seed:1 })); -->
+      <!-- new MinesweeperUi("canvas2", new Minesweeper({ width:10, height:5, mines:10 })); -->
+    </script>
+  </body>
+</html>
