@@ -23,8 +23,8 @@ i\n\
 i\n\
 </script>\n\
 .\n\
-w funminesweeper.html\n \
+w index.html\n \
 q\n" | ed funminesweeper_deps.html
 
 clean:
-	rm -f funminesweeper.html
+	rm -f index.html
