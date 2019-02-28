@@ -1,0 +1,123 @@
+<!-- Copyright (c) 2019 danamlund -->
+ 
+<!-- This program is free software: you can redistribute it and/or modify   -->
+<!-- it under the terms of the GNU General Public License as published by   -->
+<!-- the Free Software Foundation, version 3. -->
+
+<!-- This program is distributed in the hope that it will be useful, but  -->
+<!-- WITHOUT ANY WARRANTY; without even the implied warranty of  -->
+<!-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU  -->
+<!-- General Public License for more details. -->
+
+<!-- You should have received a copy of the GNU General Public License  -->
+<!-- along with this program. If not, see <http://www.gnu.org/licenses/>. -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fun minesweeper</title>
+    <script src="minesweeper.js"></script>
+    <script src="minesweeperui.js"></script>
+    <script src="minesweepersolve.js"></script>
+    <script src="minesweepermain.js"></script>
+  </head>
+  <body>
+    <div id="minesweeper"></div>
+    <script>
+      new MinesweeperMain(document.getElementById("minesweeper"));
+    </script>
+
+    <h1>Generate fun minesweeper games</h1>
+    <p>
+      Generate minesweeper games, automatically solve then, score them
+      based on fun-ness, show user the game with the highest score.
+    </p>
+    <p>
+      Fun-ness score is high for moves that require multiple pieces of
+      information. Score is negative for games that require guessing
+      to solve.
+    </p>
+    <p>
+      Marking neighbors around a "1" block with a flagged mine uses 1
+      block of information. 1-blocks are not fun and give no score. A
+      move that requires information about two numbered blocks and
+      their neighbors uses 2 blocks of information and give 1
+      score. 3-blocks give 2 score each. Moves requiring &gt;3 blocks
+      or knowledge about the number of mines left give 3 score each.
+    </p>
+    <p>
+      To score games in a consistent fashion, we start games with the
+      largest area of "0" blocks uncovered.
+    </p>
+    <p>
+      Try some high-scoring games I found:
+    </p>
+      <ul>
+        <li><a href="?16_16_40_0_1422766">16x16</a></li>
+        <li><a href="?16_16_40_0_1808281730">16x16</a></li>
+        <li><a href="?8_8_10_0_1186376845">8x8</a></li>
+      </ul>
+      
+    <h2>Minesweeper controls</h2>
+    <h3>Mouse</h3>
+    <ul>
+      <li>Left-click digs for a mine.</li>
+      <li>Right-click toggle flag.</li>
+      <li>Middle-click/double-left-click on number auto-digs if
+      easy.</li>
+      <li>Right-click on number toggles that block to
+      auto-solver.</li>
+      <li>⟳ restarts current game.</li>
+    </ul>
+
+    <h3>Touch</h3>
+    Top-right icons change behavior of left-click.
+
+    <h3>Keyboard</h3>
+    <ul>
+      <li>Arrows move highlighter around.</li>
+      <li>'d' digs for a mine.</li>
+      <li>'f' toggle flag.</li>
+      <li>'d' on number auto-digs if easy.</li>
+      <li>'s' toggles that block to auto-solver.</li>
+      <li>'r' restart current game.</li>
+      <li>'1' auto-solve 1-blocks.</li>
+      <li>'2' auto-solve 2-blocks.</li>
+      <li>'3' auto-solve 3-blocks.</li>
+      <li>'4' auto-solve all blocks.</li>
+    </ul>
+
+    <h2>Generation controls</h2>
+    <ul>
+      <li>width/height: size of minesweeper game.</li>
+      <li>mines: number of mines to place.</li>
+      <li>blocks: number of blocks to place.</li>
+      <li>iterations: number of games to generate when searching for
+      the best score.</li>
+      <li>seed: number to generate a consistent game. Copy-pasting a
+      seed url is easier.</li>
+      <li>board width/board height: size of the minesweeper game area
+      in pixels.</li>
+      <li>maximize: how to calculate score
+        <ul>
+          <li>multi blocks: more moves that require multiple pieces of
+          information.</li>
+          <li>2 blocks: only moves that require two pieces of
+          information.</li>
+          <li>3 blocks: only moves that require three pieces of
+          information.</li>
+          <li>&gt;3 blocks: only moves that require more than three
+            pieces of information.</li>
+          <li>steps: more iterations of auto-solver needed to solve a
+          game.</li>
+          <li>not remaining mines: rewards 2-blocks and 3-blocks but
+          not &gt;3-blocks. This usually removes the endings requiring
+          you to map out 5 remaining mines.</li>
+        </ul>
+      </li>
+      <li>verbose: show list of all generated games.</li>
+      <li>generate: start generating games.</li>
+      <li>stop: stop generating and use the best one so far.</li>
+    </ul>
+  </body>
+</html>
