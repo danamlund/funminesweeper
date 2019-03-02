@@ -233,7 +233,7 @@ function MinesweeperSolve(mines) {
         scores.permuteAll = 0;
         scores.unsolveable = 0;
         scores.steps = 0;
-        scores.score = 0;
+        scores.numbersCounts = [];
 
         while (true) {
             scores.steps++;
@@ -266,12 +266,14 @@ function MinesweeperSolve(mines) {
             scores.unsolveable = frees;
             break;
         }
-
-        scores.score = scores.permute2 + scores.permute3 * 2 + scores.permuteAll * 3;
-        if (scores.unsolveable >= 1) {
-            scores.score = -scores.score - 1;
-        }
         
+        for (let i = 0; i <= 8; i++) {
+            scores.numbersCounts[i] = 0;
+        }
+        for (let xy of mines.all()) {
+            scores.numbersCounts[mines.number(xy)]++;
+        }
+
         return scores;
     };
     

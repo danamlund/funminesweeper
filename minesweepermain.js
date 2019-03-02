@@ -14,7 +14,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-// Fills a div with minesweeper game and controls to generate fun games.
+// Fills a div with a minesweeper game and controls to generate fun games.
 function MinesweeperMain(divElementToPopulate) {
 
     divElementToPopulate.innerHTML = `
@@ -38,7 +38,9 @@ function MinesweeperMain(divElementToPopulate) {
 <option>&gt;3 blocks</option>
 <option>not remaining mines</option>
 <option>steps</option>
+<option>high numbers</option>
 </select>
+<input type="checkbox" class="noguessing" checked /> Exclude guessing
 </div>
 <button class="button">Generate</button>
 <input type="checkbox" class="verbose" /> verbose
@@ -85,16 +87,44 @@ function MinesweeperMain(divElementToPopulate) {
         minesweeperui = new MinesweeperUi(canvas, mines);
     }
 
-    function solveScoreString(solveScore) {
+    function solveScoreString(solveScore, maxBy, noGuessing) {
         return "1s=" + solveScore.permute1
             + ", 2s=" + solveScore.permute2
             + ", 3s=" + solveScore.permute3
             + ", alls=" + solveScore.permuteAll
             + ", steps=" + solveScore.steps
             + ", unsolveables=" + solveScore.unsolveable
-            + ", score=" + solveScore.score;
+            + ", numbers=" + JSON.stringify(solveScore.numbersCounts)
+            + ", maximize=" + maxBy
+            + ", score=" + calculateScore(solveScore, maxBy, noGuessing);
     }
-    
+
+    function calculateScore(solveScore, maxBy, noGuessing) {
+        let score = -999;
+        if (maxBy == "multi blocks") {
+            score = solveScore.permute2 + solveScore.permute3 * 2 + solveScore.permuteAll * 3;
+        } else if (maxBy == "2 blocks") {
+            score = solveScore.permute2;
+        } else if (maxBy == "3 blocks") {
+            score = solveScore.permute3;
+        } else if (maxBy == ">3 blocks") {
+            score = solveScore.permuteAll;
+        } else if (maxBy == "steps") {
+            score = solveScore.steps;
+        } else if (maxBy == "not remaining mines") {
+            score = solveScore.permute2 + 2 * solveScore.permute3;
+        } else if (maxBy == "high numbers") {
+            score = 0;
+            for (let i = 4; i <= 8; i++) {
+                score += solveScore.numbersCounts[i] * solveScore.numbersCounts[i];
+            }
+        }
+        if (noGuessing && solveScore.unsolveable >= 1) {
+            score = -score - 1;
+        }
+        return score;
+    }
+
     function generate() {
         if (generating) {
             return;
@@ -112,6 +142,7 @@ function MinesweeperMain(divElementToPopulate) {
         let blocks = parseInt(divElementToPopulate.querySelector(".blocks").value);
         let iterations = parseInt(divElementToPopulate.querySelector(".iterations").value);
         let seed = divElementToPopulate.querySelector(".seed").value;
+        let noGuessing = divElementToPopulate.querySelector(".noguessing").checked;
         let verbose = divElementToPopulate.querySelector(".verbose").checked;
         let verbosediv = divElementToPopulate.querySelector(".verbosediv");
         let log = divElementToPopulate.querySelector(".log");
@@ -126,7 +157,7 @@ function MinesweeperMain(divElementToPopulate) {
                                            seed:seed } );
             if (verbose) {
                 let solveScore = new MinesweeperSolve(mines).solveScore();
-                log.innerHTML = "Score: " + solveScoreString(solveScore) + "<br/>";
+                log.innerHTML = "Score: " + solveScoreString(solveScore, maxBy, noGuessing) + "<br/>";
             }
             mines.restart();
             show(mines);
@@ -141,7 +172,6 @@ function MinesweeperMain(divElementToPopulate) {
             let i = 0;
             let stopped = false;
             function doStop() {
-                console.log("stop!");
                 stopped = true;
             }
             let stopperDiv = divElementToPopulate.querySelector(".stopper");
@@ -153,7 +183,8 @@ function MinesweeperMain(divElementToPopulate) {
             if (verbose) {
                 verboseHtml = "<table border=1><tr>"
                     + "<td>1s</td><td>2s</td><td>3s</td><td>alls</td><td>steps</td>"
-                    + "<td>unsolveables</td><td>score</td><td>seed url</td></tr>";
+                    + "<td>unsolveables</td><td>numbers counts</td>"
+                    + "<td>maximize</td><td>score</td><td>seed url</td></tr>";
             }
             
             function done(mines) {
@@ -180,7 +211,7 @@ function MinesweeperMain(divElementToPopulate) {
                                                  blocks:blocks,
                                                  seed:seed } );
                 let solveScore = new MinesweeperSolve(mines).solveScore();
-
+                let score = calculateScore(solveScore, maxBy, noGuessing);
                 if (verbose) {
                     verboseHtml += "<tr>"
                         + "<td>" + solveScore.permute1 + "</td>"
@@ -189,27 +220,14 @@ function MinesweeperMain(divElementToPopulate) {
                         + "<td>" + solveScore.permuteAll + "</td>"
                         + "<td>" + solveScore.steps + "</td>"
                         + "<td>" + solveScore.unsolveable + "</td>"
-                        + "<td>" + solveScore.score + "</td>"
+                        + "<td>" + JSON.stringify(solveScore.numbersCounts) + "</td>"
+                        + "<td>" + maxBy + "</td>"
+                        + "<td>" + score + "</td>"
                         + "<td><a href=" + getUrlSeed(mines) + ">seed url</a></td>"
                         + "</tr>";
                 }
 
-                let score = -999;
-                if (maxBy == "multi blocks") {
-                    score = solveScore.score
-                } else if (maxBy == "2 blocks") {
-                    score = solveScore.permute2;
-                } else if (maxBy == "3 blocks") {
-                    score = solveScore.permute3;
-                } else if (maxBy == ">3 blocks") {
-                    score = solveScore.permuteAll;
-                } else if (maxBy == "steps") {
-                    score = solveScore.steps;
-                } else if (maxBy == "not remaining mines") {
-                    score = solveScore.permute2 + 2 * solveScore.permute3;
-                }
-                if (bestSolveScore == null
-                    || (solveScore.unsolveable == 0 && score > bestScore)) {
+                if (bestSolveScore == null || score > bestScore) {
                     bestSolveScore = solveScore;
                     bestScore = score;
                     bestMines = mines;
@@ -217,7 +235,8 @@ function MinesweeperMain(divElementToPopulate) {
                 i++;
                 if (verbose) {
                     log.innerHTML = "Best score of " + i + "/" + iterations
-                        + " iterations: " + solveScoreString(bestSolveScore) + "<br/>";
+                        + " iterations: " + solveScoreString(bestSolveScore, maxBy, noGuessing)
+                        + "<br/>";
                 } else {
                     log.innerHTML = "Best score of " + i + "/" + iterations
                         + " iterations: " + bestScore + "<br/>";
