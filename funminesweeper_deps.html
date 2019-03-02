@@ -1,5 +1,5 @@
 <!-- Copyright (c) 2019 danamlund -->
- 
+
 <!-- This program is free software: you can redistribute it and/or modify   -->
 <!-- it under the terms of the GNU General Public License as published by   -->
 <!-- the Free Software Foundation, version 3. -->
@@ -57,8 +57,10 @@
         <li><a href="?16_16_40_0_1422766">16x16_40 a</a></li>
         <li><a href="?16_16_40_0_1808281730">16x16_40 b</a></li>
         <li><a href="?30_16_99_0_1861752485">16x30_99</a></li>
+        <li><a href="?30_24_200_0_1529244662">30x24_200 (require
+        guesses, need more cpu cycles)</a></li>
       </ul>
-      
+
     <h2>Minesweeper controls</h2>
     <h3>Mouse</h3>
     <ul>
@@ -100,23 +102,15 @@
       <li>board width/board height: size of the minesweeper game area
       in pixels.</li>
       <li>maximize: how to calculate score
-        <ul>
-          <li>multi blocks: more moves that require multiple pieces of
-          information.</li>
-          <li>2 blocks: only moves that require two pieces of
-          information.</li>
-          <li>3 blocks: only moves that require three pieces of
-          information.</li>
-          <li>&gt;3 blocks: only moves that require more than three
-            pieces of information.</li>
-          <li>not remaining mines: rewards 2-blocks and 3-blocks but
-          not &gt;3-blocks. This usually removes the endings requiring
-          you to map out 5 remaining mines.</li>
-          <li>steps: more iterations of auto-solver needed to solve a
-            game.</li>
-          <li>high numbers: blocks with high numbers have higher
-          scores.</li>
+        <ul id="maximizersul">
         </ul>
+        <script>
+          let maximizersul = document.getElementById("maximizersul");
+          for (let maximizer of MinesweeperMain_maximizers) {
+          maximizersul.innerHTML +=
+          "<li>" + maximizer.name + ": " + maximizer.description + "</li>";
+          }
+        </script>
       </li>
       <li>verbose: show list of all generated games.</li>
       <li>generate: start generating games.</li>

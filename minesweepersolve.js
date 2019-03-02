@@ -1,16 +1,16 @@
-/* 
+/*
  * Copyright (c) 2019 danamlund
- * 
- * This program is free software: you can redistribute it and/or modify  
- * it under the terms of the GNU General Public License as published by  
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3.
  *
- * This program is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
+ * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -19,7 +19,7 @@ function MinesweeperSolve(mines) {
     let o = {};
 
     const MAX_FREES_AMOUNT = 25;
-    
+
     function xyKey(xy) {
         return xy.x + "," + xy.y;
     }
@@ -70,7 +70,7 @@ function MinesweeperSolve(mines) {
         if (frees.length > MAX_FREES_AMOUNT) {
             throw "Too many frees";
         }
-        
+
         const minesNumberMax = 1 << frees.length;
         let indexIsMineCounts = [];
         let indexIsNotMineCounts = [];
@@ -138,7 +138,7 @@ function MinesweeperSolve(mines) {
         if (includeAllFrees) {
             o.addAllFrees(frees);
         }
-        
+
         return doPermutes(frees, constraints, doNotCheckMinesLeft);
     };
 
@@ -161,7 +161,7 @@ function MinesweeperSolve(mines) {
         let constraints = prepare.constraints;
 
         addAllFrees(frees);
-        
+
         if (frees.length > maxFreesAmount) {
             return {};
         }
@@ -225,7 +225,7 @@ function MinesweeperSolve(mines) {
         return moves;
     };
 
-    o.solveScore = function(maxFreesAmount) {
+    o.solveScore = function(maxFreesAmount, guess) {
         scores = {};
         scores.permute1 = 0;
         scores.permute2 = 0;
@@ -257,16 +257,61 @@ function MinesweeperSolve(mines) {
                 scores.permuteAll += moves;
                 continue;
             }
-            let frees = 0;
-            for (const xy of mines.all()) {
-                if (mines.free(xy)) {
-                    frees++;
+
+
+            if (guess) {
+                let guesses = 0;
+                for (const xy of mines.all()) {
+                    if (mines.dug(xy) && mines.info(xy).empty >= 1) {
+                        for (const xy2 of mines.neighbors(xy)) {
+                            if (mines.free(xy2)) {
+                                if (mines.mined(xy2)) {
+                                    mines.flag(xy2);
+                                } else {
+                                    mines.dig(xy2);
+                                }
+                                guesses++;
+                            }
+                        }
+                        if (guesses >= 1) {
+                            break;
+                        }
+                    }
                 }
+                if (guessed) {
+                    scores.unsolveable += guesses;
+                    continue;
+                } else {
+                    let guessed2 = false;
+                    for (const xy of mines.all()) {
+                        if (mines.free(xy)) {
+                            if (mines.mined(xy2)) {
+                                mines.flag(xy2);
+                            } else {
+                                mines.dig(xy2);
+                            }
+                            guessed2 = true;
+                            break;
+                        }
+                    }
+                    if (guessed2) {
+                        scores.unsolveable++;
+                        continue;
+                    }
+                }
+            } else {
+                let frees = 0;
+                for (const xy of mines.all()) {
+                    if (mines.free(xy)) {
+                        frees++;
+                    }
+                }
+                scores.unsolveable += frees;
             }
-            scores.unsolveable = frees;
+
             break;
         }
-        
+
         for (let i = 0; i <= 8; i++) {
             scores.numbersCounts[i] = 0;
         }
@@ -276,11 +321,11 @@ function MinesweeperSolve(mines) {
 
         return scores;
     };
-    
+
     o.solve = function() {
         return o.solveScore(maxFreesAmount).unsolveable == 0;
     };
-    
+
     o.solveSubsetSize =  function(subsetSize) {
         let didWork = true;
         while (didWork) {
@@ -294,6 +339,6 @@ function MinesweeperSolve(mines) {
         }
         return mines.won();
     }
-    
+
     return o;
 }
