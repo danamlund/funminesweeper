@@ -209,6 +209,52 @@ function MinesweeperSolve(mines) {
         return {};
     };
 
+    function filterInfoXys(xys) {
+        let output = [];
+        for (let xy of xys) {
+            if (mines.dug(xy) && mines.info(xy).empty >= 1) {
+                output.push(xy);
+            }
+        }
+        return output;
+    }
+
+    // whether the guess probability of freeXy block is correct.
+    // true: guess is current
+    // false: guess is incorrect
+    // undefined: 50/50 guess that a user would not make
+    o.guessIsCorrect = function(freeXy, radius) {
+        if (!mines.free(freeXy)) {
+            throw "expects free blocks";
+        }
+        radius = radius || 3;
+        let infoXys = filterInfoXys(mines.circleSearchXy(freeXy, radius));
+        let xyToMineProbability = o.permutes(infoXys, true, false);
+        let mineProbability = xyToMineProbability[xyKey(freeXy)];
+        if (mineProbability > 0.45 && mineProbability < 0.55) {
+            return undefined;
+        } else {
+            let isMine = mines.mined(freeXy);
+            return mineProbability > 0.5 == isMine;
+        }
+    };
+    // whether the guess probbilities of all free blocks are correct
+    o.allGuessesAreCorrect = function(fillWithCorrectGuessXys, radius) {
+        let seenTrue = false;
+        for (let xy of mines.all()) {
+            if (mines.free(xy)) {
+                let guess = guessIsCorrect(xy, radius);
+                if (guess == false) {
+                    return false;
+                } else if (guess == true) {
+                    seenTrue = true;
+                    fillWithCorrectGuessXys.push(xy);
+                }
+            }
+        }
+        return seenTrue;
+    }
+
     o.applySolution = function(xyToMineProbability) {
         let moves = 0;
         for (xySolution of Object.values(xyToMineProbability)) {
@@ -231,6 +277,7 @@ function MinesweeperSolve(mines) {
         scores.permute2 = 0;
         scores.permute3 = 0;
         scores.permuteAll = 0;
+        scores.guessable = 0;
         scores.unsolveable = 0;
         scores.steps = 0;
         scores.numbersCounts = [];
@@ -260,43 +307,56 @@ function MinesweeperSolve(mines) {
 
 
             if (guess) {
-                let guesses = 0;
-                for (const xy of mines.all()) {
-                    if (mines.dug(xy) && mines.info(xy).empty >= 1) {
-                        for (const xy2 of mines.neighbors(xy)) {
-                            if (mines.free(xy2)) {
+                let correctGuessesXys = []
+                if (o.allGuessesAreCorrect(correctGuessesXys)) {
+                    for (let xy of correctGuessesXys) {
+                        if (mines.mined(xy)) {
+                            mines.flag(xy);
+                        } else {
+                            mines.dig(xy);
+                        }
+                    }
+                    score.guessable += correctGuessesXys.length;
+                    continue;
+                } else {
+                    let guesses = 0;
+                    for (const xy of mines.all()) {
+                        if (mines.dug(xy) && mines.info(xy).empty >= 1) {
+                            for (const xy2 of mines.neighbors(xy)) {
+                                if (mines.free(xy2)) {
+                                    if (mines.mined(xy2)) {
+                                        mines.flag(xy2);
+                                    } else {
+                                        mines.dig(xy2);
+                                    }
+                                    guesses++;
+                                }
+                            }
+                            if (guesses >= 1) {
+                                break;
+                            }
+                        }
+                    }
+                    if (guessed) {
+                        scores.unsolveable += guesses;
+                        continue;
+                    } else {
+                        let guessed2 = false;
+                        for (const xy of mines.all()) {
+                            if (mines.free(xy)) {
                                 if (mines.mined(xy2)) {
                                     mines.flag(xy2);
                                 } else {
                                     mines.dig(xy2);
                                 }
-                                guesses++;
+                                guessed2 = true;
+                                break;
                             }
                         }
-                        if (guesses >= 1) {
-                            break;
+                        if (guessed2) {
+                            scores.unsolveable++;
+                            continue;
                         }
-                    }
-                }
-                if (guessed) {
-                    scores.unsolveable += guesses;
-                    continue;
-                } else {
-                    let guessed2 = false;
-                    for (const xy of mines.all()) {
-                        if (mines.free(xy)) {
-                            if (mines.mined(xy2)) {
-                                mines.flag(xy2);
-                            } else {
-                                mines.dig(xy2);
-                            }
-                            guessed2 = true;
-                            break;
-                        }
-                    }
-                    if (guessed2) {
-                        scores.unsolveable++;
-                        continue;
                     }
                 }
             } else {

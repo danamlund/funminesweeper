@@ -1,16 +1,16 @@
-/* 
+/*
  * Copyright (c) 2019 danamlund
- * 
- * This program is free software: you can redistribute it and/or modify  
- * it under the terms of the GNU General Public License as published by  
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3.
  *
- * This program is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
+ * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -144,7 +144,7 @@ function Minesweeper(args) {
         }
         return out;
     }
-    
+
     this.copy = function() {
         let args2 = this.copyArgs();
         args2.dontInit = true;
@@ -276,6 +276,33 @@ function Minesweeper(args) {
         }
         return out;
     }
+    this.circleSearchXy = function(xy, radius) {
+        return circleSearch(xy.x, xy.y, radius);
+    }
+    this.circleSearch = function(x, y, radius) {
+        let output = [{x:x, y:y}];
+        let seenSet = {};
+
+        let queue = [{x:x, y:y}];
+        let queueNext = [];
+        for (let r = 1; r <= radius; r++) {
+            for (let xy of queue) {
+                let xy = queue.pop();
+                for (let xy2 of this.neighbors(xy)) {
+                    let key = xyKey(xy2);
+                    if (!seenSet[key]) {
+                        seenSet[key] = true;
+                        output.push(xy2);
+                        queueNext.push(xy2);
+                    }
+                }
+            }
+            queue = queueNext;
+            queueNext = [];
+        }
+        return output;
+    }
+
     this.forAll = function(fun) {
         for (var x = 0; x < this.width; x++) {
             for (var y = 0; y < this.height; y++) {
@@ -290,7 +317,7 @@ function Minesweeper(args) {
         this.forAll((x,y) => out.push({x:x, y:y}));
         return out;
     };
-    
+
     this.dig = function(x, y) {
         if (y === undefined) {
             y = x.y;
@@ -298,7 +325,7 @@ function Minesweeper(args) {
         }
         if (!this.dug(x, y) && !this.flagged(x, y) && !this.blocked(x, y)) {
             this._dug[x][y] = true;
-            
+
             if (!this.mined(x, y) && this.number(x, y) == 0) {
                 for (var n of this.neighbors(x, y)) {
                     this.dig(n.x, n.y);
@@ -306,7 +333,7 @@ function Minesweeper(args) {
             }
         }
     };
-    
+
     this.flag = function(x, y) {
         if (y === undefined) {
             y = x.y;
@@ -472,6 +499,6 @@ function Minesweeper(args) {
         this.placeMines();
         this.start();
     }
-    
+
     return this;
 }

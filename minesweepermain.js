@@ -66,7 +66,15 @@ let MinesweeperMain_maximizers =
            return - solveScore.unsolveable;
        },
        guess:true
-     }];
+     },
+     { name:"guessable",
+       description:"blocks where the calculable mine probability is corrct.",
+       scorer:function calculateScore(solveScore) {
+           return solveScore.guessable;
+       },
+       guess:true
+     },
+    ];
 
 function MinesweeperMain(divElementToPopulate) {
 
