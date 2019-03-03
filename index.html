@@ -17,19 +17,19 @@
     <meta charset="utf-8" />
     <title>Fun minesweeper</title>
 <script>
-/* 
+/*
  * Copyright (c) 2019 danamlund
- * 
- * This program is free software: you can redistribute it and/or modify  
- * it under the terms of the GNU General Public License as published by  
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 3.
  *
- * This program is distributed in the hope that it will be useful, but 
- * WITHOUT ANY WARRANTY; without even the implied warranty of 
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
+ * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -163,7 +163,7 @@ function Minesweeper(args) {
         }
         return out;
     }
-    
+
     this.copy = function() {
         let args2 = this.copyArgs();
         args2.dontInit = true;
@@ -295,6 +295,33 @@ function Minesweeper(args) {
         }
         return out;
     }
+    this.circleSearchXy = function(xy, radius) {
+        return circleSearch(xy.x, xy.y, radius);
+    }
+    this.circleSearch = function(x, y, radius) {
+        let output = [{x:x, y:y}];
+        let seenSet = {};
+
+        let queue = [{x:x, y:y}];
+        let queueNext = [];
+        for (let r = 1; r <= radius; r++) {
+            for (let xy of queue) {
+                let xy = queue.pop();
+                for (let xy2 of this.neighbors(xy)) {
+                    let key = xyKey(xy2);
+                    if (!seenSet[key]) {
+                        seenSet[key] = true;
+                        output.push(xy2);
+                        queueNext.push(xy2);
+                    }
+                }
+            }
+            queue = queueNext;
+            queueNext = [];
+        }
+        return output;
+    }
+
     this.forAll = function(fun) {
         for (var x = 0; x < this.width; x++) {
             for (var y = 0; y < this.height; y++) {
@@ -309,7 +336,7 @@ function Minesweeper(args) {
         this.forAll((x,y) => out.push({x:x, y:y}));
         return out;
     };
-    
+
     this.dig = function(x, y) {
         if (y === undefined) {
             y = x.y;
@@ -317,7 +344,7 @@ function Minesweeper(args) {
         }
         if (!this.dug(x, y) && !this.flagged(x, y) && !this.blocked(x, y)) {
             this._dug[x][y] = true;
-            
+
             if (!this.mined(x, y) && this.number(x, y) == 0) {
                 for (var n of this.neighbors(x, y)) {
                     this.dig(n.x, n.y);
@@ -325,7 +352,7 @@ function Minesweeper(args) {
             }
         }
     };
-    
+
     this.flag = function(x, y) {
         if (y === undefined) {
             y = x.y;
@@ -491,7 +518,7 @@ function Minesweeper(args) {
         this.placeMines();
         this.start();
     }
-    
+
     return this;
 }
 /* 
@@ -1036,6 +1063,52 @@ function MinesweeperSolve(mines) {
         return {};
     };
 
+    function filterInfoXys(xys) {
+        let output = [];
+        for (let xy of xys) {
+            if (mines.dug(xy) && mines.info(xy).empty >= 1) {
+                output.push(xy);
+            }
+        }
+        return output;
+    }
+
+    // whether the guess probability of freeXy block is correct.
+    // true: guess is current
+    // false: guess is incorrect
+    // undefined: 50/50 guess that a user would not make
+    o.guessIsCorrect = function(freeXy, radius) {
+        if (!mines.free(freeXy)) {
+            throw "expects free blocks";
+        }
+        radius = radius || 3;
+        let infoXys = filterInfoXys(mines.circleSearchXy(freeXy, radius));
+        let xyToMineProbability = o.permutes(infoXys, true, false);
+        let mineProbability = xyToMineProbability[xyKey(freeXy)];
+        if (mineProbability > 0.45 && mineProbability < 0.55) {
+            return undefined;
+        } else {
+            let isMine = mines.mined(freeXy);
+            return mineProbability > 0.5 == isMine;
+        }
+    };
+    // whether the guess probbilities of all free blocks are correct
+    o.allGuessesAreCorrect = function(fillWithCorrectGuessXys, radius) {
+        let seenTrue = false;
+        for (let xy of mines.all()) {
+            if (mines.free(xy)) {
+                let guess = guessIsCorrect(xy, radius);
+                if (guess == false) {
+                    return false;
+                } else if (guess == true) {
+                    seenTrue = true;
+                    fillWithCorrectGuessXys.push(xy);
+                }
+            }
+        }
+        return seenTrue;
+    }
+
     o.applySolution = function(xyToMineProbability) {
         let moves = 0;
         for (xySolution of Object.values(xyToMineProbability)) {
@@ -1058,6 +1131,7 @@ function MinesweeperSolve(mines) {
         scores.permute2 = 0;
         scores.permute3 = 0;
         scores.permuteAll = 0;
+        scores.guessable = 0;
         scores.unsolveable = 0;
         scores.steps = 0;
         scores.numbersCounts = [];
@@ -1087,43 +1161,56 @@ function MinesweeperSolve(mines) {
 
 
             if (guess) {
-                let guesses = 0;
-                for (const xy of mines.all()) {
-                    if (mines.dug(xy) && mines.info(xy).empty >= 1) {
-                        for (const xy2 of mines.neighbors(xy)) {
-                            if (mines.free(xy2)) {
+                let correctGuessesXys = []
+                if (o.allGuessesAreCorrect(correctGuessesXys)) {
+                    for (let xy of correctGuessesXys) {
+                        if (mines.mined(xy)) {
+                            mines.flag(xy);
+                        } else {
+                            mines.dig(xy);
+                        }
+                    }
+                    score.guessable += correctGuessesXys.length;
+                    continue;
+                } else {
+                    let guesses = 0;
+                    for (const xy of mines.all()) {
+                        if (mines.dug(xy) && mines.info(xy).empty >= 1) {
+                            for (const xy2 of mines.neighbors(xy)) {
+                                if (mines.free(xy2)) {
+                                    if (mines.mined(xy2)) {
+                                        mines.flag(xy2);
+                                    } else {
+                                        mines.dig(xy2);
+                                    }
+                                    guesses++;
+                                }
+                            }
+                            if (guesses >= 1) {
+                                break;
+                            }
+                        }
+                    }
+                    if (guessed) {
+                        scores.unsolveable += guesses;
+                        continue;
+                    } else {
+                        let guessed2 = false;
+                        for (const xy of mines.all()) {
+                            if (mines.free(xy)) {
                                 if (mines.mined(xy2)) {
                                     mines.flag(xy2);
                                 } else {
                                     mines.dig(xy2);
                                 }
-                                guesses++;
+                                guessed2 = true;
+                                break;
                             }
                         }
-                        if (guesses >= 1) {
-                            break;
+                        if (guessed2) {
+                            scores.unsolveable++;
+                            continue;
                         }
-                    }
-                }
-                if (guessed) {
-                    scores.unsolveable += guesses;
-                    continue;
-                } else {
-                    let guessed2 = false;
-                    for (const xy of mines.all()) {
-                        if (mines.free(xy)) {
-                            if (mines.mined(xy2)) {
-                                mines.flag(xy2);
-                            } else {
-                                mines.dig(xy2);
-                            }
-                            guessed2 = true;
-                            break;
-                        }
-                    }
-                    if (guessed2) {
-                        scores.unsolveable++;
-                        continue;
                     }
                 }
             } else {
@@ -1237,7 +1324,15 @@ let MinesweeperMain_maximizers =
            return - solveScore.unsolveable;
        },
        guess:true
-     }];
+     },
+     { name:"guessable",
+       description:"blocks where the calculable mine probability is corrct.",
+       scorer:function calculateScore(solveScore) {
+           return solveScore.guessable;
+       },
+       guess:true
+     },
+    ];
 
 function MinesweeperMain(divElementToPopulate) {
 
@@ -1507,6 +1602,7 @@ function MinesweeperMain(divElementToPopulate) {
         <li><a href="?16_16_40_0_1422766">16x16_40 a</a></li>
         <li><a href="?16_16_40_0_1808281730">16x16_40 b</a></li>
         <li><a href="?30_16_99_0_1861752485">16x30_99</a></li>
+        <li><a href="?30_20_130_0_770708169">30x24_130</a></li>
         <li><a href="?30_24_200_0_1529244662">30x24_200 (require
         guesses, need more cpu cycles)</a></li>
       </ul>
