@@ -561,6 +561,8 @@ function Minesweeper(args) {
 
 // GUI for minesweeper game given a canvas Element and a Minesweeper Object.
 function MinesweeperUi(canvas, mines, args) {
+    const MAX_FREES_AMOUNT = 25;
+
     let o = {};
     args = args || {minWidth:3, minHeight:5, showRight:true, showBottom:true};
     let x = 0;
@@ -805,7 +807,10 @@ function MinesweeperUi(canvas, mines, args) {
             new MinesweeperSolve(mines).solveSubsetSize(3);
         } else if (e.key == "4") {
             let solve = new MinesweeperSolve(mines);
-            solve.applySolution(solve.permuteAll());
+            solve.applySolution(solve.permuteAll(MAX_FREES_AMOUNT, true));
+        } else if (e.key == "5") {
+            let solve = new MinesweeperSolve(mines);
+            solve.applySolution(solve.permuteAll(MAX_FREES_AMOUNT, false));
         } else {
             return;
         }
@@ -1042,7 +1047,9 @@ function MinesweeperSolve(mines) {
         let frees = prepare.frees;
         let constraints = prepare.constraints;
 
-        addAllFrees(frees);
+        if (!doNotCheckMinesLeft) {
+            addAllFrees(frees);
+        }
 
         if (frees.length > maxFreesAmount) {
             return {};
@@ -1360,6 +1367,7 @@ let MinesweeperMain_maximizers =
     ];
 
 function MinesweeperMain(divElementToPopulate) {
+    const MAX_FREES_AMOUNT = 20;
 
     divElementToPopulate.innerHTML = `
 <canvas class="canvas" tabindex="0" width="500" height="500"></canvas>
@@ -1493,7 +1501,7 @@ function MinesweeperMain(divElementToPopulate) {
                                            seed:seed } );
             if (verbose) {
                 let solveScore = new MinesweeperSolve(mines)
-                    .solveScore(20, maximizer.guess, maximizer.doNotCheckMinesLeft);
+                    .solveScore(MAX_FREES_AMOUNT, maximizer.guess, maximizer.doNotCheckMinesLeft);
                 log.innerHTML = "Score: " + solveScoreString(solveScore, maximizer, noGuessing)
                     + "<br/>";
             }
@@ -1546,7 +1554,8 @@ function MinesweeperMain(divElementToPopulate) {
                                                  mines:minesAmount,
                                                  blocks:blocks,
                                                  seed:seed } );
-                let solveScore = new MinesweeperSolve(mines, maximizer.guess).solveScore();
+                let solveScore = new MinesweeperSolve(mines)
+                    .solveScore(MAX_FREES_AMOUNT, maximizer.guess, maximizer.doNotCheckMinesLeft);
                 let score = calculateScore(solveScore, maximizer, noGuessing);
                 if (verbose && (verbose2 || score >= 1)) {
                     verboseHtml += "<tr>"
@@ -1666,7 +1675,8 @@ function MinesweeperMain(divElementToPopulate) {
       <li>'1' auto-solve 1-blocks.</li>
       <li>'2' auto-solve 2-blocks.</li>
       <li>'3' auto-solve 3-blocks.</li>
-      <li>'4' auto-solve all blocks.</li>
+      <li>'4' auto-solve all numbered blocks and neighbors (max 25).</li>
+      <li>'5' auto-solve all blocks (max 25).</li>
     </ul>
 
     <h2>Generation controls</h2>
