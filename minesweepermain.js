@@ -28,21 +28,31 @@ let MinesweeperMain_maximizers =
        description:"only moves that require two pieces of information.",
        scorer:function calculateScore(solveScore) {
            return solveScore.permute2;
-       }
+       },
+       doNotCheckMinesLeft:true
      },
-     { name:"&gt;3 blocks",
+     { name:"3 blocks",
        description:"only moves that require three pieces of information.",
        scorer:function calculateScore(solveScore) {
+           return solveScore.permute3;
+       },
+       doNotCheckMinesLeft:true
+     },
+     { name:">3 blocks",
+       description:"only moves that require four or more pieces of information.",
+       scorer:function calculateScore(solveScore) {
            return solveScore.permuteAll;
-       }
+       },
+       doNotCheckMinesLeft:true
      },
      { name:"not remaining mines",
        description:`rewards 2-blocks and 3-blocks but
           not &gt;3-blocks. This usually removes the endings requiring
           you to map out 5 remaining mines.`,
        scorer:function calculateScore(solveScore) {
-           return solveScore.permuteAll;
-       }
+           return solveScore.permute2 + solveScore.permute3 * 2 + solveScore.permuteAll * 3;
+       },
+       doNotCheckMinesLeft:true
      },
      { name:"steps",
        description:"more iterations of auto-solver needed to solve a game.",
@@ -67,13 +77,13 @@ let MinesweeperMain_maximizers =
        },
        guess:true
      },
-     { name:"guessable",
-       description:"blocks where the calculable mine probability is corrct.",
-       scorer:function calculateScore(solveScore) {
-           return solveScore.guessable;
-       },
-       guess:true
-     },
+     // { name:"guessable",
+     //   description:"blocks where the calculable mine probability is corrct.",
+     //   scorer:function calculateScore(solveScore) {
+     //       return solveScore.guessable;
+     //   },
+     //   guess:true
+     // },
     ];
 
 function MinesweeperMain(divElementToPopulate) {
@@ -97,6 +107,7 @@ function MinesweeperMain(divElementToPopulate) {
 </div>
 <button class="button">Generate</button>
 <input type="checkbox" class="verbose" /> verbose
+<input type="checkbox" class="verbose2" /> more verbose
 <div class="stopper"></div>
 <div class="log"></div>
 <div class="verbosediv"></div>
@@ -186,6 +197,7 @@ function MinesweeperMain(divElementToPopulate) {
         let seed = divElementToPopulate.querySelector(".seed").value;
         let noGuessing = divElementToPopulate.querySelector(".noguessing").checked;
         let verbose = divElementToPopulate.querySelector(".verbose").checked;
+        let verbose2 = divElementToPopulate.querySelector(".verbose2").checked;
         let verbosediv = divElementToPopulate.querySelector(".verbosediv");
         let log = divElementToPopulate.querySelector(".log");
         log.innerHTML = "";
@@ -207,7 +219,8 @@ function MinesweeperMain(divElementToPopulate) {
                                            blocks:blocks,
                                            seed:seed } );
             if (verbose) {
-                let solveScore = new MinesweeperSolve(mines, maximizer.guess).solveScore();
+                let solveScore = new MinesweeperSolve(mines)
+                    .solveScore(20, maximizer.guess, maximizer.doNotCheckMinesLeft);
                 log.innerHTML = "Score: " + solveScoreString(solveScore, maximizer, noGuessing)
                     + "<br/>";
             }
@@ -262,7 +275,7 @@ function MinesweeperMain(divElementToPopulate) {
                                                  seed:seed } );
                 let solveScore = new MinesweeperSolve(mines, maximizer.guess).solveScore();
                 let score = calculateScore(solveScore, maximizer, noGuessing);
-                if (verbose) {
+                if (verbose && (verbose2 || score >= 1)) {
                     verboseHtml += "<tr>"
                         + "<td>" + solveScore.permute1 + "</td>"
                         + "<td>" + solveScore.permute2 + "</td>"

@@ -153,7 +153,7 @@ function MinesweeperSolve(mines) {
     }
 
 
-    o.permuteAll = function(maxFreesAmount) {
+    o.permuteAll = function(maxFreesAmount, doNotCheckMinesLeft) {
         maxFreesAmount = maxFreesAmount || MAX_FREES_AMOUNT
         let allInfoXys = o.allInfoXys();
         let prepare = preparePermutes(allInfoXys);
@@ -165,7 +165,7 @@ function MinesweeperSolve(mines) {
         if (frees.length > maxFreesAmount) {
             return {};
         }
-        return doPermutes(frees, constraints);
+        return doPermutes(frees, constraints, doNotCheckMinesLeft);
     }
 
     function subsetsOfSize(subsetSize) {
@@ -271,7 +271,7 @@ function MinesweeperSolve(mines) {
         return moves;
     };
 
-    o.solveScore = function(maxFreesAmount, guess) {
+    o.solveScore = function(maxFreesAmount, guess, doNotCheckMinesLeft) {
         scores = {};
         scores.permute1 = 0;
         scores.permute2 = 0;
@@ -284,22 +284,22 @@ function MinesweeperSolve(mines) {
 
         while (true) {
             scores.steps++;
-            let moves = o.applySolution(o.permutesSubsetSize(1));
+            let moves = o.applySolution(o.permutesSubsetSize(1, doNotCheckMinesLeft));
             if (moves) {
                 scores.permute1 += moves;
                 continue;
             }
-            moves = o.applySolution(o.permutesSubsetSize(2));
+            moves = o.applySolution(o.permutesSubsetSize(2, doNotCheckMinesLeft));
             if (moves) {
                 scores.permute2 += moves;
                 continue;
             }
-            moves = o.applySolution(o.permutesSubsetSize(3));
+            moves = o.applySolution(o.permutesSubsetSize(3, doNotCheckMinesLeft));
             if (moves) {
                 scores.permute3 += moves;
                 continue;
             }
-            moves = o.applySolution(o.permuteAll(maxFreesAmount));
+            moves = o.applySolution(o.permuteAll(maxFreesAmount, doNotCheckMinesLeft));
             if (moves) {
                 scores.permuteAll += moves;
                 continue;
@@ -307,56 +307,43 @@ function MinesweeperSolve(mines) {
 
 
             if (guess) {
-                let correctGuessesXys = []
-                if (o.allGuessesAreCorrect(correctGuessesXys)) {
-                    for (let xy of correctGuessesXys) {
-                        if (mines.mined(xy)) {
-                            mines.flag(xy);
-                        } else {
-                            mines.dig(xy);
-                        }
-                    }
-                    score.guessable += correctGuessesXys.length;
-                    continue;
-                } else {
-                    let guesses = 0;
-                    for (const xy of mines.all()) {
-                        if (mines.dug(xy) && mines.info(xy).empty >= 1) {
-                            for (const xy2 of mines.neighbors(xy)) {
-                                if (mines.free(xy2)) {
-                                    if (mines.mined(xy2)) {
-                                        mines.flag(xy2);
-                                    } else {
-                                        mines.dig(xy2);
-                                    }
-                                    guesses++;
-                                }
-                            }
-                            if (guesses >= 1) {
-                                break;
-                            }
-                        }
-                    }
-                    if (guessed) {
-                        scores.unsolveable += guesses;
-                        continue;
-                    } else {
-                        let guessed2 = false;
-                        for (const xy of mines.all()) {
-                            if (mines.free(xy)) {
+                let guesses = 0;
+                for (const xy of mines.all()) {
+                    if (mines.dug(xy) && mines.info(xy).empty >= 1) {
+                        for (const xy2 of mines.neighbors(xy)) {
+                            if (mines.free(xy2)) {
                                 if (mines.mined(xy2)) {
                                     mines.flag(xy2);
                                 } else {
                                     mines.dig(xy2);
                                 }
-                                guessed2 = true;
-                                break;
+                                guesses++;
                             }
                         }
-                        if (guessed2) {
-                            scores.unsolveable++;
-                            continue;
+                        if (guesses >= 1) {
+                            break;
                         }
+                    }
+                }
+                if (guessed) {
+                    scores.unsolveable += guesses;
+                    continue;
+                } else {
+                    let guessed2 = false;
+                    for (const xy of mines.all()) {
+                        if (mines.free(xy)) {
+                            if (mines.mined(xy2)) {
+                                mines.flag(xy2);
+                            } else {
+                                mines.dig(xy2);
+                            }
+                            guessed2 = true;
+                            break;
+                        }
+                    }
+                    if (guessed2) {
+                        scores.unsolveable++;
+                        continue;
                     }
                 }
             } else {
@@ -391,7 +378,7 @@ function MinesweeperSolve(mines) {
         while (didWork) {
             didWork = false;
             for (let i = 1; i <= subsetSize; i++) {
-                if (o.applySolution(o.permutesSubsetSize(subsetSize))) {
+                if (o.applySolution(o.permutesSubsetSize(i))) {
                     didWork = true;
                     break;
                 }

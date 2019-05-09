@@ -15,16 +15,26 @@
  */
 
 // GUI for minesweeper game given a canvas Element and a Minesweeper Object.
-function MinesweeperUi(canvas, mines) {
+function MinesweeperUi(canvas, mines, args) {
     let o = {};
+    args = args || {minWidth:3, minHeight:5, showRight:true, showBottom:true};
     let x = 0;
     let y = 0;
     let ctx = canvas.getContext("2d");
     mines = mines || new Minesweeper();
     let solveXys = {};
+    if (args.initialSolves) {
+        for (var initialSolve of args.initialSolves) {
+            toggleSolve(initialSolve.x, initialSolve.y);
+        }
+    }
     let leftMouseAction = "dig"; // "dig", "flag", "solve"
     let startTime = new Date();
     let endTime = null;
+
+    let blockWidth = Math.max(args.minWidth, mines.width + (args.showRight ? 1 : 0));
+    let blockHeight = Math.max(args.minHeight, mines.height + (args.showBottom ? 1 : 0));
+    let size = Math.floor(Math.min(canvas.width / blockWidth, canvas.height / blockHeight));
 
     function calcFont(ctx, text, width, height) {
         let oldFont = ctx.font;
@@ -66,9 +76,6 @@ function MinesweeperUi(canvas, mines) {
     }
     function draw(canvas, mines, posx, posy) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        let blockWidth = Math.max(3, mines.width + 1);
-        let blockHeight = Math.max(5, mines.height + 1);
-        var size = Math.floor(Math.min(canvas.width / blockWidth, canvas.height / blockHeight));
         var margin = 1;
         var size_wo_margin = size - 2*margin;
         
@@ -133,7 +140,7 @@ function MinesweeperUi(canvas, mines) {
         });
 
         // bottom status
-        {
+        if (args.showBottom) {
             var text = "Mines: " + mines.mines
                 + "  left: " + (mines.mines - flagged)
                 + "  time: " + duration(startTime, endTime ? endTime : new Date());
@@ -150,34 +157,36 @@ function MinesweeperUi(canvas, mines) {
         }
 
         // right column
-        ctx.font = numberFont;
-        ctx.fillStyle = "#000000";
-        ctx.fillRect(posXStart(blockWidth - 1) - margin, posYStart(0) - margin, size, 3 * size);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(posXStart(blockWidth - 1), posYStart(0), size_wo_margin, 3*size - 2*margin);
-        ctx.fillStyle = "#000000";
-
-        function highlight(x, y) {
-            ctx.fillStyle = "#cccccc";
-            ctx.fillRect(posXStart(x), posYStart(y), size_wo_margin, size_wo_margin);
+        if (args.showRight) {
+            ctx.font = numberFont;
             ctx.fillStyle = "#000000";
-        }
-        
-        if (leftMouseAction == "dig") {
-            highlight(blockWidth - 1, 0);
-        }
-        ctx.fillText("⛏", posXMiddle(blockWidth - 1), posYMiddle(0));
+            ctx.fillRect(posXStart(blockWidth - 1) - margin, posYStart(0) - margin, size, 3 * size);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(posXStart(blockWidth - 1), posYStart(0), size_wo_margin, 3*size - 2*margin);
+            ctx.fillStyle = "#000000";
 
-        if (leftMouseAction == "flag") {
-            highlight(blockWidth - 1, 1);
-        }
-        ctx.fillText("🚩", posXMiddle(blockWidth - 1), posYMiddle(1));
+            function highlight(x, y) {
+                ctx.fillStyle = "#cccccc";
+                ctx.fillRect(posXStart(x), posYStart(y), size_wo_margin, size_wo_margin);
+                ctx.fillStyle = "#000000";
+            }
+            
+            if (leftMouseAction == "dig") {
+                highlight(blockWidth - 1, 0);
+            }
+            ctx.fillText("⛏", posXMiddle(blockWidth - 1), posYMiddle(0));
 
-        if (leftMouseAction == "solve") {
-            highlight(blockWidth - 1, 2);
+            if (leftMouseAction == "flag") {
+                highlight(blockWidth - 1, 1);
+            }
+            ctx.fillText("🚩", posXMiddle(blockWidth - 1), posYMiddle(1));
+
+            if (leftMouseAction == "solve") {
+                highlight(blockWidth - 1, 2);
+            }
+            ctx.fillText("⚙", posXMiddle(blockWidth - 1), posYMiddle(2));
+            ctx.fillText("⟳", posXMiddle(blockWidth - 1), posYMiddle(3));
         }
-        ctx.fillText("⚙", posXMiddle(blockWidth - 1), posYMiddle(2));
-        ctx.fillText("⟳", posXMiddle(blockWidth - 1), posYMiddle(3));
     }
 
     function digRemaining(x, y) {
@@ -264,9 +273,6 @@ function MinesweeperUi(canvas, mines) {
         mouseX = e.clientX - rect.left;
         mouseY = e.clientY - rect.top;
 
-        let blockWidth = Math.max(3, mines.width + 1);
-        let blockHeight = Math.max(5, mines.height + 1);
-        var size = Math.floor(Math.min(canvas.width / blockWidth, canvas.height / blockHeight));
         var newX = Math.floor(mouseX / size);
         var newY = Math.floor(mouseY / size);
 

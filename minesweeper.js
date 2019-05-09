@@ -36,6 +36,8 @@ function Minesweeper(args) {
     this._dug = [];
     this._blocked = [];
     this.initialDugs = this.args.initialDugs;
+    this.initialFlags = this.args.initialFlags;
+    this.initialMined = this.args.initialMined;
 
     // Initializes/clears game
     this.clear = function() {
@@ -85,6 +87,16 @@ function Minesweeper(args) {
     // Places mines randomly
     this.placeMines = function() {
         this.clearMined();
+
+        if (this.args.initialMined) {
+            this.mines = 0;
+            for (let xy of this.args.initialMined) {
+                this._mined[xy.x][xy.y] = true;
+                this.mines++;
+            }
+            return;
+        }
+        
         var count = 10000;
         for (let blocksLeft = this.blocks; blocksLeft > 0;) {
             var x = rand() % this.width;
@@ -158,6 +170,7 @@ function Minesweeper(args) {
             }
         }
         copy.initialDugs = this.initialDugs ? this.initialDugs.splice() : undefined;
+        copy.initialFlags = this.initialFlags ? this.initialFlags.splice() : undefined;
         return copy;
     };
 
@@ -477,9 +490,16 @@ function Minesweeper(args) {
     }
 
     this.start = function() {
-        if (this.initialDugs) {
-            for (let xy of this.initialDugs) {
-                this.dig(xy);
+        if (this.initialDugs || this.initialFlags) {
+            if (this.initialDugs) {
+                for (let xy of this.initialDugs) {
+                    this.dig(xy);
+                }
+            }
+            if (this.initialFlags) {
+                for (let xy of this.initialFlags) {
+                    this.flag(xy);
+                }
             }
         } else {
             highest = this.highestZeroNeighbors();
@@ -496,7 +516,9 @@ function Minesweeper(args) {
 
     this.clear();
     if (!this.args.dontInit) {
-        this.placeMines();
+        if (!this.args.mined) {
+            this.placeMines();
+        }
         this.start();
     }
 
