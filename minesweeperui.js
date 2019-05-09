@@ -16,6 +16,8 @@
 
 // GUI for minesweeper game given a canvas Element and a Minesweeper Object.
 function MinesweeperUi(canvas, mines, args) {
+    const MAX_FREES_AMOUNT = 25;
+
     let o = {};
     args = args || {minWidth:3, minHeight:5, showRight:true, showBottom:true};
     let x = 0;
@@ -260,7 +262,10 @@ function MinesweeperUi(canvas, mines, args) {
             new MinesweeperSolve(mines).solveSubsetSize(3);
         } else if (e.key == "4") {
             let solve = new MinesweeperSolve(mines);
-            solve.applySolution(solve.permuteAll());
+            solve.applySolution(solve.permuteAll(MAX_FREES_AMOUNT, true));
+        } else if (e.key == "5") {
+            let solve = new MinesweeperSolve(mines);
+            solve.applySolution(solve.permuteAll(MAX_FREES_AMOUNT, false));
         } else {
             return;
         }

@@ -87,6 +87,7 @@ let MinesweeperMain_maximizers =
     ];
 
 function MinesweeperMain(divElementToPopulate) {
+    const MAX_FREES_AMOUNT = 20;
 
     divElementToPopulate.innerHTML = `
 <canvas class="canvas" tabindex="0" width="500" height="500"></canvas>
@@ -220,7 +221,7 @@ function MinesweeperMain(divElementToPopulate) {
                                            seed:seed } );
             if (verbose) {
                 let solveScore = new MinesweeperSolve(mines)
-                    .solveScore(20, maximizer.guess, maximizer.doNotCheckMinesLeft);
+                    .solveScore(MAX_FREES_AMOUNT, maximizer.guess, maximizer.doNotCheckMinesLeft);
                 log.innerHTML = "Score: " + solveScoreString(solveScore, maximizer, noGuessing)
                     + "<br/>";
             }
@@ -273,7 +274,8 @@ function MinesweeperMain(divElementToPopulate) {
                                                  mines:minesAmount,
                                                  blocks:blocks,
                                                  seed:seed } );
-                let solveScore = new MinesweeperSolve(mines, maximizer.guess).solveScore();
+                let solveScore = new MinesweeperSolve(mines)
+                    .solveScore(MAX_FREES_AMOUNT, maximizer.guess, maximizer.doNotCheckMinesLeft);
                 let score = calculateScore(solveScore, maximizer, noGuessing);
                 if (verbose && (verbose2 || score >= 1)) {
                     verboseHtml += "<tr>"

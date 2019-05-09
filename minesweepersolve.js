@@ -160,7 +160,9 @@ function MinesweeperSolve(mines) {
         let frees = prepare.frees;
         let constraints = prepare.constraints;
 
-        addAllFrees(frees);
+        if (!doNotCheckMinesLeft) {
+            addAllFrees(frees);
+        }
 
         if (frees.length > maxFreesAmount) {
             return {};
